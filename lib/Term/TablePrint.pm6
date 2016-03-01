@@ -1,36 +1,42 @@
 use v6;
 unit class Term::TablePrint;
 
-my $VERSION = '0.004';
+my $VERSION = '0.005';
 
+use NCurses;
 use Term::Choose;
 use Term::Choose::LineFold :all;
 use Term::Choose::Util :all;
-use Term::ProgressBar;
 
-constant CLEAR_SCREEN = "\e[H\e[J";
-constant HIDE_CURSOR  = "\e[?25l";
-constant SHOW_CURSOR  = "\e[?25h";
 
 
 has %.o_global; #
 has %!o;
 
+has NCurses::WINDOW $!g_win = initscr();
 has List $!a_ref;
 has Int  @!cols_w;
 has Int  @!heads_w;
 has Int  @!new_cols_w;
 
 has Int  @!not_a_number;
-has Int  $!show_progress;
-has Str  $!computing = 'Computing:';
 has Str  $!binary_str = 'BNRY';
+
+has Int $!show_progress;
+has Str $!computing = 'Computing:';
+has Int $!total;
+has Int $!bar_w;
+has Str $!progressbar_fmt;
 
 
 method new ( %o_global? ) {
     _validate_options( %o_global );
     _set_defaults( %o_global );
     self.bless( :%o_global );
+}
+
+submethod DESTROY () { #
+    endwin();
 }
 
 sub _set_defaults ( %opt ) {
@@ -91,16 +97,19 @@ method !_choose_cols_with_order ( @avail_cols ) {
     my Str $ok = '-ok-';
     my Str @pre = ( $ok );
     my @col_idxs;
+    my $tc = Term::Choose.new(
+        { lf => [ 0, $subseq_tab ], index => 1, no_spacebar => [ 0 .. @pre.end ], mouse => %!o<mouse> },
+        $!g_win
+    );
  
     loop {
         my Str @chosen_cols = @col_idxs.list ?? @avail_cols[@col_idxs] !! '*';
         my Str $prompt = $init_prompt ~ @chosen_cols.join: ', ';
         my Str @choices = |@pre, |@avail_cols;
         # Choose
-        my Int @idx = choose_multi(
+        my Int @idx = $tc.choose_multi(
             @choices,
-            { prompt => $prompt, lf => [ 0, $subseq_tab ], index => 1,
-              no_spacebar => [ 0 .. @pre.end ], mouse => %!o<mouse> }
+            { prompt => $prompt }
         );
         if ! @idx[0].defined || ! @choices[@idx[0]].defined { ##
             if @col_idxs.elems {
@@ -123,13 +132,16 @@ method !_choose_cols_with_order ( @avail_cols ) {
 }
 
 method !_choose_cols_simple ( @avail_cols ) {
+    my $tc = Term::Choose.new(
+        { mouse => %!o<mouse> },
+        $!g_win
+    );
     my Str $all = '-*-';
     my Str @pre = ( $all );
     my @choices = |@pre, |@avail_cols;
-    my Int @idx = choose_multi(
+    my Int @idx = $tc.choose_multi(
         @choices,
-        { prompt => 'Choose: ', no_spacebar => [ 0 .. @pre.end ],
-          index => 1, mouse => %!o<mouse> }
+        { prompt => 'Choose: ', no_spacebar => [ 0 .. @pre.end ], index => 1 }
     );
     if ! @idx[0].defined { ##
         return;
@@ -163,6 +175,7 @@ method print_table ( @table, %!o? ) {
         @col_idxs = self!_choose_cols_simple(     @table[0] ) if %!o<choose_columns> == 1;
         @col_idxs = self!_choose_cols_with_order( @table[0] ) if %!o<choose_columns> == 2;
         if @col_idxs.elems && ! @col_idxs[0].defined {##
+            endwin();
             return;
         }
     }
@@ -178,21 +191,19 @@ method print_table ( @table, %!o? ) {
             $!a_ref = @table[0..$last_row_idx];
         }
     }
-
     if %!o<progress_bar> {
-        print HIDE_CURSOR;
-        print CLEAR_SCREEN; #
-        say $!computing ~ ' ...';
+        #mvaddstr( 0, 0, $!computing ~ ' ...' ); ###
         $!show_progress = ( $!a_ref.elems * $!a_ref[0].elems / %!o<progress_bar> ).Int;
+        if $!show_progress >= 1 {
+            curs_set( 0 );
+            $!progressbar_fmt = $!computing ~ ' [%s%s]';
+            $!total = $!a_ref.elems;
+        }
     }
 
     self!_calc_col_width();
     self!_inner_print_tbl();
-
-    if %!o<progress_bar> {
-        print SHOW_CURSOR;
-        print "\r", ' ' x 7, "\r";
-    }
+    endwin();
 }
 
 
@@ -216,6 +227,11 @@ method !_inner_print_tbl {
     my Int $old_row = 0;
     my Int $auto_jumped_to_first_row = 2;
     my Int $expanded = 0;
+    my $tc = Term::Choose.new(
+        { ll => $len, index => 1, layout => 2, mouse => %!o<mouse> },
+        $!g_win
+    );
+
 
     loop {
         if term_width() != $term_w {
@@ -233,13 +249,15 @@ method !_inner_print_tbl {
             $prompt ~= $header;
         }
         # Choose
-        my Int $row = choose(
+        my Int $row = $tc.choose(
             $list,
-            { prompt => $prompt, default => $old_row, ll => $len,
-              index => 1, layout => 2, mouse => %!o<mouse> }
+            { prompt => $prompt, default => $old_row }
         );
         if ! $row.defined {
             return;
+        }
+        elsif $row == -1 {
+            next;
         }
         if $header.defined {
             $list.unshift: $header;
@@ -308,7 +326,11 @@ method !_print_single_row ( Int $row ) {
             }
         }
     }
-    pause(
+    my $tc = Term::Choose.new(
+        {},
+        $!g_win
+    );
+    $tc.pause(
         @lines,
         { prompt => '', layout => 2, mouse => %!o<mouse> }
     );
@@ -319,22 +341,23 @@ sub _sanitized_string ( $str ) {
     return $str.trim.subst( / \s+ /, ' ', :g ).subst( / <:C> /, '', :g );
 }
 
+
+method !_progressbar_update( Int $c ) {
+    my $multi = ( $c / ( $!total / $!bar_w ) ).ceiling;
+    #my $ext ~= ' ' ~ ( $multi * ( 100 / $!bar_w ) ).Int ~ "%";
+    clear();
+    mvaddstr( 0, 0, sprintf $!progressbar_fmt, '=' x $multi, ' ' x $!bar_w - $multi );
+    nc_refresh();
+}
+
+
 method !_calc_col_width {
-    my Int $total = $!a_ref.elems;         #
-    my Int $step;                          #
-    my Int $c = 0;                         #
-    my $progress;                          #
-    if $!show_progress >= 2 {              #
-        my $name = $!computing;            #
-        my Int $bar_w = term_width() - $name.chars - 6; #
-        print CLEAR_SCREEN;                #
-        $progress = Term::ProgressBar.new( #
-            name  => $name,                #
-            count => $total,               #
-            width => $bar_w,               #
-        );                                 #
-        $step = $total div $bar_w || 1;    #
-    }                                      #
+    my Int $step;
+    my Int $c = 0;
+    if $!show_progress >= 2 {
+        $!bar_w = getmaxx( $!g_win ) - ( sprintf $!progressbar_fmt, '', '' ).chars - 1;
+        $step = $!total div $!bar_w || 1;    #
+    }
     my regex binary_regexp { <[\x00 .. \x08 \x0B .. \x0C \x0E .. \x1F]> }
     my Int $undef_w = print_columns( %!o<undef> );
     @!cols_w = 1 xx $!a_ref[0].elems;
@@ -369,12 +392,12 @@ method !_calc_col_width {
                 }
             }
         }
-        if $progress {                                         #
-            ++$c;                                              #
-            $progress.update( $c ) if $c %% $step;             #
-        }                                                      #
+        if $step {
+            ++$c;
+            self!_progressbar_update( $c ) if $c %% $step;
+        }
     }
-    $progress.update( $total ) if $progress && $total % $step; #
+    self!_progressbar_update( $!total ) if $step && $!total % $step;
 }
 
 
@@ -461,26 +484,16 @@ sub _minus_x_percent ( Int $value, Int $percent ) {
 
 
 method !_cols_to_avail_width {
-    my Int $total = $!a_ref.elems;         #
-    my Int $step;                          #
-    my Int $c = 0;                         #
-    my $progress;                          #
-    if $!show_progress {                   #
-        my Str $name = $!computing;        #
-        my Int $bar_w = term_width() - $name.chars - 6; #
-        print CLEAR_SCREEN;                #
-        $progress = Term::ProgressBar.new( #
-            name => $name,                 #
-            count => $total,               #
-            width => $bar_w,               #
-        );                                 #
-        $step = $total div $bar_w || 1;    #
-    }                                      #
+    my Int $step;
+    my Int $c = 0;
+    if $!show_progress {
+        $!bar_w = getmaxx( $!g_win ) - ( sprintf $!progressbar_fmt, '', '' ).chars - 1;
+        $step = $!total div $!bar_w || 1;    #
+    }
     my Int @col_idx = 0 .. @!new_cols_w.end;
     my Str $tab = ' ' x %!o<tab_width>;
-    
     my Array $list;
-    
+
     for $!a_ref.list -> $row {
         my Str $str = '';
         for @col_idx -> $i {
@@ -502,12 +515,12 @@ method !_cols_to_avail_width {
             $str ~= $tab if $i != @!new_cols_w.end;
         }
         $list.push: $str;
-        if $progress {                                         #
-            ++$c;                                              #
-            $progress.update( $c ) if $c %% $step;             #
-        }                                                      #
+        if $step {
+            ++$c;
+            self!_progressbar_update( $c ) if $c %% $step;
+        }
     }
-    $progress.update( $total ) if $progress && $total % $step; #
+    self!_progressbar_update( $!total ) if $step && $!total % $step;
     return $list;
 }
 
@@ -522,7 +535,7 @@ Term::TablePrint - Print a table to the terminal and browse it interactively.
 
 =head1 VERSION
 
-Version 0.004
+Version 0.005
 
 =head1 SYNOPSIS
 

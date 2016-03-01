@@ -1,5 +1,10 @@
 Revision history for Term::TablePrint
 
 
+0.005   2016-03-01
+        - Use NCurses
+        - Pass global ncurses-win to Term::Choose
+        - Resized window: rewrite screen immediately
+
 0.004   2016-02-25
         - 0.004
