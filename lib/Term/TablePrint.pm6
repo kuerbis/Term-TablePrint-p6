@@ -1,7 +1,7 @@
 use v6;
 unit class Term::TablePrint;
 
-my $VERSION = '0.005';
+my $VERSION = '0.006';
 
 use NCurses;
 use Term::Choose;
@@ -535,7 +535,7 @@ Term::TablePrint - Print a table to the terminal and browse it interactively.
 
 =head1 VERSION
 
-Version 0.005
+Version 0.006
 
 =head1 SYNOPSIS
 
@@ -564,6 +564,8 @@ Version 0.005
 =end code
 
 =head1 DESCRIPTION
+
+C<Term::TablePrint> currently supports only ascii-characters strings.
 
 C<print_table> shows a table and lets the user interactively browse it. It provides a cursor which highlights the row
 on which it is located. The user can scroll through the table with the different cursor keys - see L<#KEYS>.

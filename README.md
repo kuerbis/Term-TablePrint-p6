@@ -8,7 +8,7 @@ Term::TablePrint - Print a table to the terminal and browse it interactively.
 VERSION
 =======
 
-Version 0.005
+Version 0.006
 
 SYNOPSIS
 ========
@@ -35,6 +35,8 @@ SYNOPSIS
 
 DESCRIPTION
 ===========
+
+`Term::TablePrint` currently supports only ascii-characters strings.
 
 `print_table` shows a table and lets the user interactively browse it. It provides a cursor which highlights the row on which it is located. The user can scroll through the table with the different cursor keys - see [#KEYS](#KEYS).
 

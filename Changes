@@ -1,6 +1,9 @@
 Revision history for Term::TablePrint
 
 
+0.006   2016-03-10
+        - Update documentation
+
 0.005   2016-03-01
         - Use NCurses
         - Pass global ncurses-win to Term::Choose
