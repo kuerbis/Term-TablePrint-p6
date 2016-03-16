@@ -1,19 +1,18 @@
 use v6;
 unit class Term::TablePrint;
 
-my $VERSION = '0.006';
+my $VERSION = '0.007';
 
-use NCurses;
 use Term::Choose;
+use Term::Choose::NCurses :all;
 use Term::Choose::LineFold :all;
 use Term::Choose::Util :all;
-
 
 
 has %.o_global; #
 has %!o;
 
-has NCurses::WINDOW $!g_win = initscr();
+has Term::Choose::NCurses::WINDOW $!g_win;
 has List $!a_ref;
 has Int  @!cols_w;
 has Int  @!heads_w;
@@ -170,6 +169,10 @@ method print_table ( @table, %!o? ) {
         @table.unshift: [ ( 1 .. @table[0].elems ).map: { $_ ~ '_' ~ %!o<no_col> } ];
     }
 
+    my int32 constant LC_ALL = 6;
+    setlocale( LC_ALL, "" );
+    $!g_win = initscr();
+
     my Int @col_idxs;
     if %!o<choose_columns> {
         @col_idxs = self!_choose_cols_simple(     @table[0] ) if %!o<choose_columns> == 1;
@@ -192,7 +195,7 @@ method print_table ( @table, %!o? ) {
         }
     }
     if %!o<progress_bar> {
-        #mvaddstr( 0, 0, $!computing ~ ' ...' ); ###
+        #mvaddstr( 0, 0, $!computing ~ ' ...' ); #
         $!show_progress = ( $!a_ref.elems * $!a_ref[0].elems / %!o<progress_bar> ).Int;
         if $!show_progress >= 1 {
             curs_set( 0 );
@@ -231,7 +234,6 @@ method !_inner_print_tbl {
         { ll => $len, index => 1, layout => 2, mouse => %!o<mouse> },
         $!g_win
     );
-
 
     loop {
         if term_width() != $term_w {
@@ -535,7 +537,7 @@ Term::TablePrint - Print a table to the terminal and browse it interactively.
 
 =head1 VERSION
 
-Version 0.006
+Version 0.007
 
 =head1 SYNOPSIS
 
@@ -564,8 +566,6 @@ Version 0.006
 =end code
 
 =head1 DESCRIPTION
-
-C<Term::TablePrint> currently supports only ascii-characters strings.
 
 C<print_table> shows a table and lets the user interactively browse it. It provides a cursor which highlights the row
 on which it is located. The user can scroll through the table with the different cursor keys - see L<#KEYS>.

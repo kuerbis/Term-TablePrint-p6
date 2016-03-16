@@ -8,8 +8,8 @@
     "Term::TablePrint" : "lib/Term/TablePrint.pm6"
   },
   "depends" : [
-    "NCurses",
     "Term::Choose",
+    "Term::Choose::NCurses",
     "Term::Choose::LineFold",
     "Term::Choose::Util"
   ],
