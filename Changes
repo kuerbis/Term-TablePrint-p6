@@ -1,6 +1,9 @@
 Revision history for Term::TablePrint
 
 
+0.012   2016-05-15
+        - Replaced underscores with hyphens in option- and routine-names.
+
 0.011   2016-04-27
         - Announcement incompatible changes
 
