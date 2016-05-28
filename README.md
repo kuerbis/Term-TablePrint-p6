@@ -8,7 +8,7 @@ Term::TablePrint - Print a table to the terminal and browse it interactively.
 VERSION
 =======
 
-Version 0.012
+Version 0.013
 
 SYNOPSIS
 ========
@@ -29,9 +29,9 @@ SYNOPSIS
 
         # or OO style:
 
-        my $pt = Term::TablePrint->new();
+        my $pt = Term::TablePrint.new();
 
-        $pt->print-table( @table );
+        $pt.print-table( @table );
 
 DESCRIPTION
 ===========
@@ -45,6 +45,8 @@ If the terminal is too narrow to print the table, the columns are adjusted to th
 If the option table-expand is enabled and a row is selected with `Return`, each column of that row is output in its own line preceded by the column name. This might be useful if the columns were cut due to the too low terminal width.
 
 The following modifications are made (at a copy of the original data) before the output.
+
+        .gist
 
 Leading and trailing whitespaces are removed.
 
@@ -114,17 +116,6 @@ add-header
 ----------
 
 If *add-header* is set to 1, `print-table` adds a header row - the columns are numbered starting with 1.
-
-Default: 0
-
-binary-filter
--------------
-
-If *binary-filter* is set to 1, "BNRY" is printed instead of arbitrary binary data.
-
-If the data matches the repexp `/[\x00-\x08\x0B-\x0C\x0E-\x1F]/`, it is considered arbitrary binary data.
-
-Printing arbitrary binary data could break the output.
 
 Default: 0
 

@@ -1,7 +1,7 @@
 use v6;
 unit class Term::TablePrint;
 
-my $VERSION = '0.012';
+my $VERSION = '0.013';
 
 use Term::Choose;
 use Term::Choose::NCurses   :all;
@@ -10,16 +10,16 @@ use Term::Choose::Util      :all;
 
 
 has %.o_global; #
+has Term::Choose::NCurses::WINDOW $.g_win;
+
+has Term::Choose::NCurses::WINDOW $!win;
 has %!o;
 
-has Term::Choose::NCurses::WINDOW $!g_win;
 has List $!a_ref;
 has Int  @!cols_w;
 has Int  @!heads_w;
 has Int  @!new_cols_w;
-
 has Int  @!not_a_number;
-has Str  $!binary_str = 'BNRY';
 
 has Int $!show_progress;
 has Str $!computing = 'Computing:';
@@ -28,19 +28,18 @@ has Int $!bar_w;
 has Str $!progressbar_fmt;
 
 
-method new ( %o_global? ) {
+method new ( %o_global?, $g_win=Term::Choose::NCurses::WINDOW ) {
     _validate_options( %o_global );
     _set_defaults( %o_global );
-    self.bless( :%o_global );
+    self.bless( :%o_global, :$g_win );
 }
 
 submethod DESTROY () { #
-    endwin();
+    self!_end_term();
 }
 
 sub _set_defaults ( %opt ) {
     %opt<add-header>     //= 0;
-    %opt<binary-filter>  //= 0;
     %opt<choose-columns> //= 0;
     %opt<keep-header>    //= 1;
     %opt<max-rows>       //= 50000;
@@ -61,7 +60,6 @@ sub _valid_options {
         progress-bar    => '<[ 0 .. 9 ]>+',
         tab-width       => '<[ 0 .. 9 ]>+',
         add-header      => '<[ 0 1 ]>',
-        binary-filter   => '<[ 0 1 ]>',
         keep-header     => '<[ 0 1 ]>',
         choose-columns  => '<[ 0 1 2 ]>',
         table-expand    => '<[ 0 1 2 ]>',
@@ -98,7 +96,7 @@ method !_choose_cols_with_order ( @avail_cols ) {
     my @col_idxs;
     my $tc = Term::Choose.new(
         { lf => [ 0, $subseq_tab ], no-spacebar => [ 0 .. @pre.end ], mouse => %!o<mouse> },
-        $!g_win
+        $!win
     );
  
     loop {
@@ -133,7 +131,7 @@ method !_choose_cols_with_order ( @avail_cols ) {
 method !_choose_cols_simple ( @avail_cols ) {
     my $tc = Term::Choose.new(
         { mouse => %!o<mouse> },
-        $!g_win
+        $!win
     );
     my Str $all = '-*-';
     my Str @pre = ( $all );
@@ -152,13 +150,36 @@ method !_choose_cols_simple ( @avail_cols ) {
 }
 
 
+
+method !_init_term {
+    if $!g_win {
+        $!win = $!g_win;
+    }
+    else {
+        my int32 constant LC_ALL = 6;
+        setlocale( LC_ALL, "" );
+        $!win = initscr;
+    }
+}
+
+method !_end_term {
+    return if $!g_win;
+    endwin();
+}
+
+
+
 sub print-table ( @table, %opt? ) is export {
     return Term::TablePrint.new().print-table( @table, %opt );
 }
 
 method print-table ( @table, %!o? ) { # ###
     if ! @table.elems {
-        pause( [ 'Close with ENTER' ], { prompt => "'print-table': Empty table!" } );
+        my $tc = Term::Choose.new(
+            { mouse => %!o<mouse>},
+            $!win
+        );
+        $tc.pause( [ 'Close with ENTER' ], { prompt => "'print-table': Empty table!" } );
         return;
     }
     _validate_options( %!o );
@@ -168,17 +189,13 @@ method print-table ( @table, %!o? ) { # ###
     if %!o<add-header> {
         @table.unshift: [ ( 1 .. @table[0].elems ).map: { $_ ~ '_' ~ %!o<no-col> } ];
     }
-
-    my int32 constant LC_ALL = 6;
-    setlocale( LC_ALL, "" );
-    $!g_win = initscr();
-
+    self!_init_term();
     my Int @col_idxs;
     if %!o<choose-columns> {
         @col_idxs = self!_choose_cols_simple(     @table[0] ) if %!o<choose-columns> == 1;
         @col_idxs = self!_choose_cols_with_order( @table[0] ) if %!o<choose-columns> == 2;
         if @col_idxs.elems && ! @col_idxs[0].defined {##
-            endwin();
+            self!_end_term();
             return;
         }
     }
@@ -205,12 +222,13 @@ method print-table ( @table, %!o? ) { # ###
 
     self!_calc_col_width();
     self!_inner_print_tbl();
-    endwin();
+    self!_end_term();
+    return;
 }
 
 
 method !_inner_print_tbl {
-    my Int $term_w = getmaxx( $!g_win );
+    my Int $term_w = getmaxx( $!win );
     my Bool $term_w_ok = self!_calc_avail_width( $term_w );
     if ! $term_w_ok {
         return;
@@ -231,12 +249,12 @@ method !_inner_print_tbl {
     my Int $expanded = 0;
     my $tc = Term::Choose.new(
         { ll => $len, layout => 2, mouse => %!o<mouse> },
-        $!g_win
+        $!win
     );
 
     loop {
-        if getmaxx( $!g_win ) != $term_w {
-            $term_w = getmaxx( $!g_win );
+        if getmaxx( $!win ) != $term_w {
+            $term_w = getmaxx( $!win );
             self!_inner_print_tbl();
             return;
         }
@@ -300,7 +318,7 @@ method !_inner_print_tbl {
 
 
 method !_print_single_row ( Int $row ) {
-    my Int $term_w = getmaxx( $!g_win );
+    my Int $term_w = getmaxx( $!win );
     my Int $key_w = @!heads_w.max + 1; #
     if $key_w > $term_w div 100 * 33 {
         $key_w = $term_w div 100 * 33;
@@ -328,18 +346,18 @@ method !_print_single_row ( Int $row ) {
         }
     }
     my $tc = Term::Choose.new(
-        {},
-        $!g_win
+        { mouse => %!o<mouse>},
+        $!win
     );
     $tc.pause(
         @lines,
-        { prompt => '', layout => 2, mouse => %!o<mouse> }
+        { prompt => '', layout => 2 }
     );
 }
 
 
 sub _sanitized_string ( $str ) {
-    return $str.trim.subst( / \s+ /, ' ', :g ).subst( / <:C> /, '', :g );
+    $str.trim.subst( / \s+ /, ' ', :g ).subst( / <:C> /, '', :g );
 }
 
 
@@ -356,10 +374,9 @@ method !_calc_col_width {
     my Int $step;
     my Int $c = 0;
     if $!show_progress >= 2 {
-        $!bar_w = getmaxx( $!g_win ) - ( sprintf $!progressbar_fmt, '', '' ).chars - 1;
+        $!bar_w = getmaxx( $!win ) - ( sprintf $!progressbar_fmt, '', '' ).chars - 1;
         $step = $!total div $!bar_w || 1;    #
     }
-    my regex binary_regexp { <[\x00 .. \x08 \x0B .. \x0C \x0E .. \x1F]> }
     my Int $undef_w = print-columns( %!o<undef> );
     @!cols_w = 1 xx $!a_ref[0].elems;
     my Int $normal_row = 0;
@@ -369,14 +386,14 @@ method !_calc_col_width {
         for @col_idx -> $i {
             my Int $str_w;
             if ! $row[$i].defined {
+                $row[$i] = %!o<undef>;
                 $str_w = $undef_w;
             }
-            elsif %!o<binary-filter> && $row[$i].substr( 0, 100 ).match: / <binary_regexp> / { #
-                $str_w = $!binary_str.chars;
-            }
             else {
-                $str_w = print-columns( _sanitized_string( $row[$i] ) );
+                $row[$i] = _sanitized_string( $row[$i].gist );
+                $str_w = print-columns( $row[$i] );
             }
+
             if $normal_row {
                 if $str_w > @!cols_w[$i] {
                     @!cols_w[$i] = $str_w;
@@ -423,15 +440,19 @@ method !_calc_avail_width ( Int $term_w ) {
     elsif $sum > $avail_w {
         my Int $mininum_w = %!o<min-col-width> || 1;
         if @!heads_w.elems > $avail_w {
+            my $tc = Term::Choose.new(
+                { mouse => %!o<mouse>},
+                $!win
+            );
             my $prompt1 = 'Terminal window is not wide enough to print this table.';
-            pause(
+            $tc.pause(
                 [ 'Press ENTER to show the column names.' ],
-                { prompt => $prompt1, mouse => %!o<mouse> }
+                { prompt => $prompt1 }
             );
             my Str $prompt2 = 'Reduce the number of columns".' ~ "\n" ~ 'Close with ENTER.';
-            pause(
+            $tc.pause(
                 $!a_ref[0],
-                { prompt => $prompt2, mouse => %!o<mouse> }
+                { prompt => $prompt2 }
             );
             return False;
         }
@@ -446,7 +467,7 @@ method !_calc_avail_width ( Int $term_w ) {
                     next;
                 }
                 if $mininum_w >= _minus_x_percent( @tmp_cols_w[$i], $percent ) {
-                    @tmp_cols_w[$i] = $mininum_w;
+                    @tmp_cols_w[$i] = $mininum_w;%!o<undef>
                 }
                 else {
                     @tmp_cols_w[$i] = _minus_x_percent( @tmp_cols_w[$i], $percent );
@@ -488,7 +509,7 @@ method !_cols_to_avail_width {
     my Int $step;
     my Int $c = 0;
     if $!show_progress {
-        $!bar_w = getmaxx( $!g_win ) - ( sprintf $!progressbar_fmt, '', '' ).chars - 1;
+        $!bar_w = getmaxx( $!win ) - ( sprintf $!progressbar_fmt, '', '' ).chars - 1;
         $step = $!total div $!bar_w || 1;    #
     }
     my Int @col_idx = 0 .. @!new_cols_w.end;
@@ -498,21 +519,11 @@ method !_cols_to_avail_width {
     for $!a_ref.list -> $row {
         my Str $str = '';
         for @col_idx -> $i {
-            if ! $row[$i].defined {
-                $str ~= unicode-sprintf( 
-                    %!o<undef>, 
-                    @!new_cols_w[$i],
-                    @!not_a_number[$i] ?? 0 !! 1 );
-            }
-            elsif %!o<binary-filter> && $row[$i].substr( 0, 100 ).match: / <binary_regexp> / { #
-                $str ~= $!binary_str.substr: 0, @!new_cols_w[$i];
-            }
-            else {
-                $str ~= unicode-sprintf( 
-                    _sanitized_string( $row[$i] ),
-                    @!new_cols_w[$i],
-                    @!not_a_number[$i] ?? 0 !! 1 );
-            }
+            $str ~= unicode-sprintf( 
+                $row[$i],
+                @!new_cols_w[$i],
+                @!not_a_number[$i] ?? 0 !! 1 );
+
             $str ~= $tab if $i != @!new_cols_w.end;
         }
         $list.push: $str;
@@ -536,7 +547,7 @@ Term::TablePrint - Print a table to the terminal and browse it interactively.
 
 =head1 VERSION
 
-Version 0.012
+Version 0.013
 
 =head1 SYNOPSIS
 
@@ -558,9 +569,9 @@ Version 0.012
 
     # or OO style:
 
-    my $pt = Term::TablePrint->new();
+    my $pt = Term::TablePrint.new();
 
-    $pt->print-table( @table );
+    $pt.print-table( @table );
 
 =end code
 
@@ -579,6 +590,12 @@ If the option table-expand is enabled and a row is selected with C<Return>, each
 line preceded by the column name. This might be useful if the columns were cut due to the too low terminal width.
 
 The following modifications are made (at a copy of the original data) before the output.
+
+=begin code
+
+    .gist
+
+=end code
 
 Leading and trailing whitespaces are removed.
 
@@ -660,16 +677,6 @@ String displayed above the table.
 =head2 add-header
 
 If I<add-header> is set to 1, C<print-table> adds a header row - the columns are numbered starting with 1.
-
-Default: 0
-
-=head2 binary-filter
-
-If I<binary-filter> is set to 1, "BNRY" is printed instead of arbitrary binary data.
-
-If the data matches the repexp C</[\x00-\x08\x0B-\x0C\x0E-\x1F]/>, it is considered arbitrary binary data.
-
-Printing arbitrary binary data could break the output.
 
 Default: 0
 
