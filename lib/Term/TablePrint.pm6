@@ -1,12 +1,12 @@
 use v6;
 unit class Term::TablePrint;
 
-my $VERSION = '0.013';
+my $VERSION = '0.014';
 
 use Term::Choose;
-use Term::Choose::NCurses   :all;
-use Term::Choose::LineFold  :all;
-use Term::Choose::Util      :all;
+use Term::Choose::NCurses;
+use Term::Choose::LineFold;
+use Term::Choose::Util;
 
 
 has %.o_global; #
@@ -547,7 +547,7 @@ Term::TablePrint - Print a table to the terminal and browse it interactively.
 
 =head1 VERSION
 
-Version 0.013
+Version 0.014
 
 =head1 SYNOPSIS
 

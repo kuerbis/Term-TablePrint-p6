@@ -1,8 +1,12 @@
 Revision history for Term::TablePrint
 
 
+0.014   2016-10-13
+        - Subroutines: use the default export
+
 0.013   2016-05-28
         - Removed option 'binary-filter'
+        - Code refactoring
         - Update documentation
 
 0.012   2016-05-15
