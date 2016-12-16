@@ -1,12 +1,12 @@
 use v6;
 unit class Term::TablePrint;
 
-my $VERSION = '0.015';
+my $VERSION = '0.016';
 
-use Term::Choose;
+use Term::Choose           :choose, :choose-multi, :pause;
 use Term::Choose::NCurses;
-use Term::Choose::LineFold;
-use Term::Choose::Util;
+use Term::Choose::LineFold :to-printwidth, :line-fold, :print-columns;
+use Term::Choose::Util     :insert-sep, :unicode-sprintf;
 
 
 has %.defaults; #
@@ -168,7 +168,7 @@ method !_end_term {
 }
 
 
-sub print-table ( @table, %opt? ) is export {
+sub print-table ( @table, %opt? ) is export( :DEFAULT, :print-table ) {
     return Term::TablePrint.new().print-table( @table, %opt );
 }
 
@@ -327,7 +327,7 @@ method !_print_single_row ( Int $row ) {
     my $col_w = $term_w - ( $key_w + $sep_w + 1 ); #
     my @lines = ' Close with ENTER';
     for 0 .. $!a_ref[$row].end -> $col {
-        my Str $key = cut-to-printwidth( # 
+        my Str $key = to-printwidth( # 
             _sanitized_string( $!a_ref[0][$col] // %!o<undef> ),
             $key_w
         );
@@ -546,19 +546,20 @@ Term::TablePrint - Print a table to the terminal and browse it interactively.
 
 =head1 VERSION
 
-Version 0.015
+Version 0.016
 
 =head1 SYNOPSIS
 
 =begin code
+
+    use Term::TablePrint :print-table;
+
 
     my @table = ( [ 'id', 'name' ],
                   [    1, 'Ruth' ],
                   [    2, 'John' ],
                   [    3, 'Mark' ],
                   [    4, 'Nena' ], );
-
-    use Term::TablePrint;
 
 
     # Functional style:
@@ -573,6 +574,11 @@ Version 0.015
     $pt.print-table( @table );
 
 =end code
+
+=head1 FUNCTIONAL INTERFACE
+
+Importing the subroutine explicitly (C<:print-table>) might become compulsory (optional for now) with the
+next release.
 
 =head1 DESCRIPTION
 
