@@ -11,6 +11,7 @@
   ],
   "description" : "Print a table to the terminal and browse it interactively.",
   "name" : "Term::TablePrint",
+  "license" : "Artistic-2.0",
   "perl" : "6.c",
   "provides" : {
     "Term::TablePrint" : "lib/Term/TablePrint.pm6"
