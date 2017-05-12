@@ -7,7 +7,6 @@ perl6:
 install:
   - rakudobrew build zef
   - zef install Term::Choose
-  - zef install Term::Choose::Util
 sudo: false
 
 
