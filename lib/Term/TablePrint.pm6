@@ -42,6 +42,7 @@ submethod DESTROY () { #
 sub _set_defaults ( %opt ) {
     %opt<add-header>     //= 0;
     %opt<choose-columns> //= 0;
+    %opt<grid>           //= 0;
     %opt<keep-header>    //= 1;
     %opt<max-rows>       //= 50000;
     %opt<min-col-width>  //= 30;
@@ -52,6 +53,7 @@ sub _set_defaults ( %opt ) {
     %opt<table-expand>   //= 1;
     %opt<undef>          //= '';
     %opt<no-col> = 'col'; #
+    %opt<tab-w> = %opt<tab-width>;
 }
 
 sub _valid_options {
@@ -62,6 +64,7 @@ sub _valid_options {
         tab-width       => '<[ 0 .. 9 ]>+',
         add-header      => '<[ 0 1 ]>',
         keep-header     => '<[ 0 1 ]>',
+        grid            => '<[ 0 1 ]>',
         choose-columns  => '<[ 0 1 2 ]>',
         table-expand    => '<[ 0 1 2 ]>',
         mouse           => '<[ 0 1 ]>',
@@ -185,6 +188,9 @@ method print-table ( @orig_table, %!o? ) { # ###
     for %!defaults.kv -> $key, $value {
         %!o{$key} //= $value;
     }
+    if %!o<grid> && %!o<tab-width> %% 2 {
+        %!o<tab-w>++;
+    }
     if %!o<add-header> {
         @orig_table.unshift: [ ( 1 .. @orig_table[0].elems ).map: { $_ ~ '_' ~ %!o<no-col> } ];
     }
@@ -233,7 +239,7 @@ method !_inner_print_tbl {
         return;
     }
     my Array $list = self!_cols_to_avail_width();
-    my Int   $len  = [+] |@!new_cols_w, %!o<tab-width> * @!new_cols_w.end;
+    my Int   $len  = [+] |@!new_cols_w, %!o<tab-w> * @!new_cols_w.end;
     if %!o<max-rows> && $list.elems - 1 >= %!o<max-rows> {
         my Str $limit = insert-sep( %!o<max-rows>, ' ' );
         my Str $reached_limit = 'REACHED LIMIT "MAX_ROWS": ' ~ $limit;
@@ -257,14 +263,16 @@ method !_inner_print_tbl {
             self!_inner_print_tbl();
             return;
         }
-        my Str $header = Str;
-        if %!o<keep-header> && $list.elems > 1 {
-            $header = $list.shift;
+        my Str @header;
+        my Int $header_size = %!o<grid> ?? 2 !! 1;
+        
+        if %!o<keep-header> && $list.elems > $header_size {
+            @header = $list.splice( 0, $header_size );
         }
         my Str $prompt = %!o<prompt>;
-        if $header.defined {
+        if @header.elems {
             $prompt ~= "\n" if $prompt.chars;
-            $prompt ~= $header;
+            $prompt ~= @header.join( "\n" );
         }
         # Choose
         my Int $row = $tc.choose(
@@ -277,8 +285,8 @@ method !_inner_print_tbl {
         elsif $row == -1 {
             next;
         }
-        if $header.defined {
-            $list.unshift: $header;
+        if @header.elems {
+            $list.unshift: |@header;
         }
         if ! %!o<table-expand> {
             return if $row == 0;
@@ -308,6 +316,12 @@ method !_inner_print_tbl {
             $old_row = $row;
             if %!o<keep-header> {
                 $row++;
+            }
+            else {
+                if %!o<grid> {
+                    next   if $row == 1;
+                    $row-- if $row > 1;
+                }
             }
             $expanded = 1;
             self!_print_single_row( $row );
@@ -434,7 +448,7 @@ method !_calc_col_width {
 
 method !_calc_avail_width ( Int $term_w ) {
     @!new_cols_w  = @!cols_w;
-    my Int $avail_w = $term_w - %!o<tab-width> * @!new_cols_w.end;
+    my Int $avail_w = $term_w - %!o<tab-w> * @!new_cols_w.end;
     my Int $sum = [+] @!new_cols_w;
     if $sum < $avail_w {
         HEAD: loop {
@@ -526,7 +540,13 @@ method !_cols_to_avail_width {
         $step = $!total div $!bar_w || 1;    #
     }
     my Int @col_idx = 0 .. @!new_cols_w.end;
-    my Str $tab = ' ' x %!o<tab-width>;
+    my Str $tab;# = ' ' x %!o<tab-width>; ####
+    if %!o<grid> {
+        $tab = ( ' ' x ( %!o<tab-w> div 2 ) ) ~ '|' ~ ( ' ' x ( %!o<tab-w> div 2 ) );
+    }
+    else {
+        $tab = ' ' x %!o<tab-w>;
+    }
     my $threads = Term::Choose.new.num-threads();
     while $threads > $!table.elems {
         last if $threads == 1;
@@ -559,7 +579,20 @@ method !_cols_to_avail_width {
             $list[.[0]] = .[1]; # :=
         }
     }
-    self!_progressbar_update( $!total ) if $step && $!total % $step;
+    
+        self!_progressbar_update( $!total ) if $step && $!total % $step;
+    
+    
+    if %!o<grid> {
+        my Str $header_sep = '';
+        for ^@!new_cols_w {
+            $header_sep ~= '-' x @!new_cols_w[$_];
+            my $t = $tab.subst( / \s /, '-', :g );
+            $header_sep ~= $t if $_ != @!new_cols_w.end;
+        }
+        $list.splice: 1, 0, $header_sep;
+    }
+
     return $list;
 }
 
