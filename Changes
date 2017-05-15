@@ -1,6 +1,9 @@
 Revision history for Term::TablePrint
 
 
+0.023   2017-05-15
+        - Pod: show the different format settings graphically (#2)
+
 0.022   2017-05-14
         - Bugfix not_a_number
         - Code refactoring
