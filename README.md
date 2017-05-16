@@ -247,7 +247,7 @@ Default: 10_000
 tab-width
 ---------
 
-Set the number of spaces between columns.
+Set the number of spaces between columns. If *format* is set to `2` and *tab-width* is even, the spaces between the columns are *tab-width* + 1 print columns.
 
 Default: 2
 
@@ -280,15 +280,30 @@ Set the string that will be shown on the screen instead of an undefined field.
 
 Default: "" (empty string)
 
-ENVIRONMENT VARIABLES
-=====================
+ENVIRONMET VARIABLES
+====================
 
-See [Term::Choose#ENVIRONMENT VARIABLES](Term::Choose#ENVIRONMENT VARIABLES).
+multithreading
+--------------
+
+`Term::TablePrint` uses multithreading when preparing the list for the output; the number of threads to use can be set with the environment variable `TC_NUM_TREADS`.
+
+head2 libncurses
+
+The location of the used ncurses library can be specified by setting the environment variable `PERL6_NCURSES_LIB`. This will overwrite the autodetected ncurses library location.
 
 REQUIREMENTS
 ============
 
-See [Term::Choose#REQUIREMENTS](Term::Choose#REQUIREMENTS).
+libncurses
+----------
+
+Requires `libncursesw` to be installed.
+
+Monospaced font
+---------------
+
+It is required a terminal that uses a monospaced font which supports the printed characters.
 
 CREDITS
 =======
