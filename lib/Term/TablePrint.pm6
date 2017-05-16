@@ -1,7 +1,7 @@
 use v6;
 unit class Term::TablePrint;
 
-my $VERSION = '0.024';
+my $VERSION = '0.025';
 
 use Term::Choose           :choose, :choose-multi, :pause;
 use Term::Choose::NCurses;
@@ -113,7 +113,7 @@ method !_choose_cols_with_order ( @avail_cols ) {
         # Choose
         my Int @idx = $tc.choose-multi(
             @choices,
-            { prompt => $prompt, index => 1 }
+            { prompt => $prompt, index => 1, mouse => %!o<mouse> }
         );
         if ! @idx[0].defined || ! @choices[@idx[0]].defined { ##
             if @col_idxs.elems {
@@ -603,7 +603,7 @@ Term::TablePrint - Print a table to the terminal and browse it interactively.
 
 =head1 VERSION
 
-Version 0.024
+Version 0.025
 
 =head1 SYNOPSIS
 
@@ -628,7 +628,7 @@ Version 0.024
 
     my $pt = Term::TablePrint.new();
 
-    $pt.print-table( @table );
+    $pt.print-table( @table, { mouse => 1, choose-columns => 2 } );
 
 =end code
 

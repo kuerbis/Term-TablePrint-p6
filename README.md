@@ -8,7 +8,7 @@ Term::TablePrint - Print a table to the terminal and browse it interactively.
 VERSION
 =======
 
-Version 0.024
+Version 0.025
 
 SYNOPSIS
 ========
@@ -32,7 +32,7 @@ SYNOPSIS
 
         my $pt = Term::TablePrint.new();
 
-        $pt.print-table( @table );
+        $pt.print-table( @table, { mouse => 1, choose-columns => 2 } );
 
 FUNCTIONAL INTERFACE
 ====================
