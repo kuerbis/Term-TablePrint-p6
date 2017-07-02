@@ -8,7 +8,7 @@ Term::TablePrint - Print a table to the terminal and browse it interactively.
 VERSION
 =======
 
-Version 0.026
+Version 0.027
 
 SYNOPSIS
 ========
@@ -32,7 +32,7 @@ SYNOPSIS
 
         my $pt = Term::TablePrint.new();
 
-        $pt.print-table( @table, { mouse => 1, choose-columns => 2 } );
+        $pt.print-table( @table, :mouse( 1 ), :choose-columns( 2 ) );
 
 FUNCTIONAL INTERFACE
 ====================
@@ -118,11 +118,7 @@ The constructor method `new` can be called with optional named arguments:
 
   * defaults
 
-Expects as its value a hash. Sets the defaults for the instance. See [#OPTIONS](#OPTIONS).
-
-  * win
-
-Expects as its value a window object created by ncurses `initscr`.
+Sets the defaults (a list of key-value pairs) for the instance. See [#OPTIONS](#OPTIONS).
 
 If set, `print-table` uses this global window instead of creating their own without calling `endwin` to restores the terminal before returning.
 
@@ -134,11 +130,13 @@ print-table
 
 `print-table` prints the table passed with the first argument.
 
-    print-table( @table, %options );
+    print-table( @table, *%options );
 
-The first argument is an array of arrays. The first array of these arrays holds the column names. The following arrays are the table rows where the elements are the field values.
+The first argument is an list of arrays. The first array of these arrays holds the column names. The following arrays are the table rows where the elements are the field values.
 
-As a optional second argument it can be passed a hash which holds the options.
+The following arguments set the options.
+
+Passing the options as a hash is deprecated. The support of passing the options as a hash may be removed with the next release.
 
 OPTIONS
 =======
