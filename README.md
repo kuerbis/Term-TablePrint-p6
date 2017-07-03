@@ -8,7 +8,7 @@ Term::TablePrint - Print a table to the terminal and browse it interactively.
 VERSION
 =======
 
-Version 0.027
+Version 0.028
 
 SYNOPSIS
 ========
@@ -32,7 +32,7 @@ SYNOPSIS
 
         my $pt = Term::TablePrint.new();
 
-        $pt.print-table( @table, :mouse( 1 ), :choose-columns( 2 ) );
+        $pt.print-table( @table, :mouse(1), :choose-columns(2) );
 
 FUNCTIONAL INTERFACE
 ====================
@@ -119,6 +119,10 @@ The constructor method `new` can be called with optional named arguments:
   * defaults
 
 Sets the defaults (a list of key-value pairs) for the instance. See [#OPTIONS](#OPTIONS).
+
+  * win
+
+Expects as its value a `WINDOW` object - the return value of [NCurses](NCurses) `initscr`.
 
 If set, `print-table` uses this global window instead of creating their own without calling `endwin` to restores the terminal before returning.
 

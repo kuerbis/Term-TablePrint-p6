@@ -1,10 +1,12 @@
 use v6;
 unit class Term::TablePrint;
 
-my $VERSION = '0.027';
+my $VERSION = '0.028';
+
+use NCurses;
+use Term::Choose::NCursesAdd;
 
 use Term::Choose           :choose, :choose-multi, :pause;
-use Term::Choose::NCurses;
 use Term::Choose::LineFold :to-printwidth, :line-fold, :print-columns;
 use Term::Choose::Util     :insert-sep, :unicode-sprintf;
 
@@ -12,8 +14,8 @@ use Term::Choose::Util     :insert-sep, :unicode-sprintf;
 has %!defaults; #
 has %!o;
 
-has Term::Choose::NCurses::WINDOW $!win;
-has Term::Choose::NCurses::WINDOW $!win_local;
+has WINDOW $!win;
+has WINDOW $!win_local;
 
 has List $!table;
 has Int  @!cols_w;
@@ -28,7 +30,7 @@ has Int $!bar_w;
 has Str $!progressbar_fmt;
 
 
-method new ( :$defaults, :$win=Term::Choose::NCurses::WINDOW ) {
+method new ( :$defaults, :$win=WINDOW ) {
     self.bless( :$defaults, :$win );
 }
 
@@ -163,7 +165,7 @@ method !_init_term {
     else {
         my int32 constant LC_ALL = 6;
         setlocale( LC_ALL, "" );
-        $!win_local = initscr() or die "Failed to initialize ncurses\n"; #
+        $!win_local = initscr();
     }
 }
 
@@ -591,7 +593,7 @@ Term::TablePrint - Print a table to the terminal and browse it interactively.
 
 =head1 VERSION
 
-Version 0.027
+Version 0.028
 
 =head1 SYNOPSIS
 
@@ -616,7 +618,7 @@ Version 0.027
 
     my $pt = Term::TablePrint.new();
 
-    $pt.print-table( @table, :mouse( 1 ), :choose-columns( 2 ) );
+    $pt.print-table( @table, :mouse(1), :choose-columns(2) );
 
 =end code
 
@@ -730,6 +732,10 @@ The constructor method C<new> can be called with optional named arguments:
 =item defaults
 
 Sets the defaults (a list of key-value pairs) for the instance. See L<#OPTIONS>.
+
+=item win
+
+Expects as its value a C<WINDOW> object - the return value of L<NCurses> C<initscr>.
 
 If set, C<print-table> uses this global window instead of creating their own without calling C<endwin> to restores the
 terminal before returning.
