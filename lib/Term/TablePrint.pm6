@@ -1,7 +1,6 @@
 use v6;
-unit class Term::TablePrint;
+unit class Term::TablePrint:ver<0.0.1>;
 
-my $VERSION = '0.028';
 
 use NCurses;
 use Term::Choose::NCursesAdd;
@@ -590,10 +589,6 @@ method !_cols_to_avail_width {
 =head1 NAME
 
 Term::TablePrint - Print a table to the terminal and browse it interactively.
-
-=head1 VERSION
-
-Version 0.028
 
 =head1 SYNOPSIS
 

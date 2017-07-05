@@ -25,5 +25,5 @@
   "test-depends" : [
     "Test"
   ],
-  "version" : "*"
+  "version" : "0.0.1"
 }

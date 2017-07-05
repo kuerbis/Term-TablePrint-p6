@@ -5,11 +5,6 @@ NAME
 
 Term::TablePrint - Print a table to the terminal and browse it interactively.
 
-VERSION
-=======
-
-Version 0.028
-
 SYNOPSIS
 ========
 
