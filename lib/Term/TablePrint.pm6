@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<0.0.1>;
+unit class Term::TablePrint:ver<0.0.2>;
 
 
 use NCurses;
@@ -40,10 +40,6 @@ submethod BUILD( :$defaults, :$win ) {
     $!win := $win;
 }
 
-
-submethod DESTROY () { #
-    self!_end_term();
-}
 
 sub _set_defaults ( %opt ) {
     %opt<add-header>     //= 0;
@@ -179,6 +175,9 @@ sub print-table ( @orig_table, %deprecated?, *%opt ) is export( :DEFAULT, :print
 }
 
 method print-table ( @orig_table, %deprecated?, *%opt ) {
+    CATCH {
+        endwin();
+    }
     %!o = %deprecated || %opt;
     if ! @orig_table.elems {
         my $tc = Term::Choose.new(
