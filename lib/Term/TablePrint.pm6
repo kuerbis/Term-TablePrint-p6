@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.0.0>;
+unit class Term::TablePrint:ver<1.0.1>;
 
 
 use NCurses;
@@ -610,7 +610,7 @@ If the option table-expand is enabled and a row is selected with C<Return>, each
 line preceded by the column name. This might be useful if the columns were cut due to the too low terminal width.
 
 Before the output modifications are made (at a copy of the original data). Leading and trailing whitespaces are removed
-and paces are squashed to a single white-space. In addition, characters of the Unicode property C<Other> are removed.
+and spaces are squashed to a single white-space. In addition, characters of the Unicode property C<Other> are removed.
 The the elements are stringified with C<gist>.
 
 The elements in a column are right-justified if one or more elements of that column do not look like a number, else they
