@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.0.8>;
+unit class Term::TablePrint:ver<1.0.9>;
 
 use NCurses;
 use Term::Choose::NCursesAdd;
@@ -95,20 +95,21 @@ method print-table (
     }
     # ###
 
-    # ### remove and pod
-    if %!o<add-header>.defined {
-        $!tc.pause( ( 'Close with ENTER', ), :prompt( 'The \'print-table\' option "add-header" is deprecated and will be removed.' ) );
-        if %!o<add-header> && ! %!o<col-names>.elems {
-            %!o<col-names> = [ 'col', ];
-        }
-    }
-    # ###
-
     if ! @orig_table.elems {
         $!tc.pause( ( 'Close with ENTER', ), :prompt( '"print-table": Empty table!' ) );
         self!_end_term;
         return;
     }
+
+    # ### remove and pod
+    if %!o<add-header>.defined {
+        $!tc.pause( ( 'Close with ENTER', ), :prompt( 'The \'print-table\' option "add-header" is deprecated and will be removed.' ) );
+        if %!o<add-header> {
+            @orig_table.unshift: [ ( 1 .. @orig_table[0].elems ).map: { $_ ~ 'col' } ];
+        }
+    }
+    # ###
+
     $!tab_w = %!o<tab-width>;
     if %!o<grid> && %!o<tab-width> %% 2 {
         $!tab_w++;
@@ -651,6 +652,10 @@ Defaults may change in future releases.
 String displayed above the table.
 
 =head2 add-header DEPRECATED
+
+This option is deprecated and will be removed.
+
+Enabling I<add-header> alters the passed list.
 
 If I<add-header> is set to 1, C<print-table> adds a header row - the columns are numbered starting with 1.
 
