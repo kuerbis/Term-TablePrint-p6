@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.2.0>;
+unit class Term::TablePrint:ver<1.3.0>;
 
 use NCurses;
 use Term::Choose::NCursesAdd;
@@ -581,6 +581,8 @@ Keys to move around:
 =item the C<ArrowDown> key (or the C<j> key) to move down and  the C<ArrowUp> key (or the C<k> key) to move up.
 
 =item the C<PageUp> key (or C<Ctrl-B>) to go back one page, the C<PageDown> key (or C<Ctrl-F>) to go forward one page.
+
+=item the C<Insert> key to go back 25 pages, the C<Delete> key to go forward 25 pages.
 
 =item the C<Home> key (or C<Ctrl-A>) to jump to the first row of the table, the C<End> key (or C<Ctrl-E>) to jump to the last
 row of the table.

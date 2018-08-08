@@ -56,6 +56,8 @@ Keys to move around:
 
   * the `PageUp` key (or `Ctrl-B`) to go back one page, the `PageDown` key (or `Ctrl-F`) to go forward one page.
 
+  * the `Insert` key to go back 25 pages, the `Delete` key to go forward 25 pages.
+
   * the `Home` key (or `Ctrl-A`) to jump to the first row of the table, the `End` key (or `Ctrl-E`) to jump to the last row of the table.
 
 With *format* set to `0` the `Return` key closes the table if the cursor is on the header row.

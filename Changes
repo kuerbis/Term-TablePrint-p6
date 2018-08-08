@@ -1,13 +1,16 @@
 Revision history for Term::TablePrint
 
 
+1.3.0  2018-08-08
+        - The Insert key goes back 25 pages, the Delete key goes forward 25 pages
+
 1.2.0  2018-06-27
         - Removed deprecated option "add_header"
         - "no-spacebar" to "meta-items"
 
 1.1.0  2018-04-29
         - Environment variable "TC_RESET_AUTO_UP"
-        - Bugfix: wrong sprintf format in row limit.
+        - Bugfix: wrong sprintf format in row limit
 
 1.0.10  2018-02-04
         - Bugfix: no output if one table row and "keep_header" enabled
