@@ -1,6 +1,10 @@
 Revision history for Term::TablePrint
 
 
+1.3.1  2018-08-24
+        - First upload to CPAN
+        - Adapt the progressbar-format to the terminal width
+
 1.3.0  2018-08-08
         - The Insert key goes back 25 pages, the Delete key goes forward 25 pages
 

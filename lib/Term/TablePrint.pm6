@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.3.0>;
+unit class Term::TablePrint:ver<1.3.1>;
 
 use NCurses;
 use Term::Choose::NCursesAdd;
@@ -30,10 +30,10 @@ has Str        $.prompt         = '';
 has Str        $.undef          = '';
 
 has List $!table;
-has Int  @!w_cols;
-has Int  @!w_heads;
-has Int  @!new_w_cols;
-has Int  @!not_a_number;
+has Int @!w_cols;
+has Int @!w_heads;
+has Int @!new_w_cols;
+has Int @!not_a_number;
 
 has Int $!tab_w; #
 has Str $!info_row;
@@ -41,7 +41,7 @@ has Int $!total;
 has Int $!bar_w;
 has Str $!thsd_sep = ',';
 has Int $!show_progress = 0;
-has Str $!progressbar_fmt = 'Computing: [%s%s]';
+has Str $!progressbar_fmt;
 
 has Term::Choose $!tc;
 
@@ -277,8 +277,10 @@ method !_calc_col_width {
     my Str $undef    = _sanitized_string( %!o<undef> );
     my Int $undef_w  = print-columns( $undef );
     my Int $step;
+    my $term_w = getmaxx( $!win );
+    $!progressbar_fmt = $term_w > 25 ?? 'Computing: [%s%s]' !! '[%s%s]';
     if $!show_progress >= 2 {
-        $!bar_w = getmaxx( $!win ) - ( sprintf $!progressbar_fmt, '', '' ).chars - 1;
+        $!bar_w = $term_w - ( sprintf $!progressbar_fmt, '', '' ).chars - 1;
         $step = $!total div $!bar_w || 1;
     }
     my Int $threads = Term::Choose.new.num-threads();
@@ -401,8 +403,10 @@ method !_calc_avail_col_width ( Int $term_w ) {
 
 method !_col_to_avail_col_width( @list ) {
     my Int $step;
+    my $term_w = getmaxx( $!win );
+    $!progressbar_fmt = $term_w > 25 ?? 'Computing: [%s%s]' !! '[%s%s]';
     if $!show_progress {
-        $!bar_w = getmaxx( $!win ) - ( sprintf $!progressbar_fmt, '', '' ).chars - 1;
+        $!bar_w = $term_w - ( sprintf $!progressbar_fmt, '', '' ).chars - 1;
         $step = $!total div $!bar_w || 1;    #
     }
     my Int @col_idx = 0 .. @!new_w_cols.end;
