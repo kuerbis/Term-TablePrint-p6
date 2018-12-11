@@ -32,7 +32,7 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-`print-table` shows a table and lets the user interactively browse it. It provides a cursor which highlights the row on which it is located. The user can scroll through the table with the different cursor keys - see [#KEYS](#KEYS).
+`print-table` shows a table and lets the user interactively browse it. It provides a cursor which highlights the row on which it is located. The user can scroll through the table with the different cursor keys - see [KEYS](#KEYS).
 
 If the table has more rows than the terminal, the table is divided up on as many pages as needed automatically. If the cursor reaches the end of a page, the next page is shown automatically until the last page is reached. Also if the cursor reaches the topmost line, the previous page is shown automatically if it is not already the first one.
 
@@ -40,9 +40,17 @@ If the terminal is too narrow to print the table, the columns are adjusted to th
 
 If the option table-expand is enabled and a row is selected with `Return`, each column of that row is output in its own line preceded by the column name. This might be useful if the columns were cut due to the too low terminal width.
 
-Before the output modifications are made (at a copy of the original data). Leading and trailing whitespaces are removed and spaces are squashed to a single white-space. In addition, characters of the Unicode property `Other` are removed.
+The following modifications are made (at a copy of the original data) to the table elements before the output.
 
-The elements in a column are right-justified if one or more elements of that column do not look like a number, else they are left-justified.
+Tab characters (`\t`) are replaces with a space.
+
+Vertical spaces (`\v`) are squashed to two spaces
+
+Control characters, code points of the surrogate ranges and non-characters are removed.
+
+If the option *squash-spaces* is enabled leading and trailing spaces are removed from the array elements and spaces are squashed to a single space.
+
+If an element looks like a number it is left-justified, else it is right-justified.
 
 USAGE
 =====
@@ -79,7 +87,7 @@ If the option *choose-columns* is enabled, the `SpaceBar` key (or the right mous
 CONSTRUCTOR
 ===========
 
-The constructor method `new` can be called with named arguments. For the valid options see [#OPTIONS](#OPTIONS). Setting the options in `new` overwrites the default values for the instance.
+The constructor method `new` can be called with named arguments. For the valid options see [OPTIONS](#OPTIONS). Setting the options in `new` overwrites the default values for the instance.
 
 Additionally to the options mentioned below one can set the option [win](win). The opton [win](win) expects as its value a `WINDOW` object - the return value of [NCurses](NCurses) `initscr`.
 
@@ -115,6 +123,15 @@ choose-columns
 If *choose-columns* is set to 1, the user can choose which columns to print. Columns can be added (with the `SpaceBar` and the `Return` key) until the user confirms with the *-ok-* menu entry.
 
 Default: 0
+
+decimal_separator
+-----------------
+
+Set the decimal separator. Numbers with a decimal separator are formatted as number if this option is set to the right value.
+
+Allowed values: a character with a print width of `1`. If an invalid values is passed, *decimal_separator* falls back to the default value.
+
+Default: . (dot)
 
 keep-header
 -----------
@@ -214,7 +231,14 @@ progress-bar
 
 Set the progress bar threshold. If the number of fields (rows x columns) is higher than the threshold, a progress bar is shown while preparing the data for the output. Setting the value to `0` disables the progress bar.
 
-Default: 10_000
+Default: 5_000
+
+squash-spaces
+-------------
+
+If *squash-spaces* is enabled, consecutive spaces are squashed to one space and leading and trailing spaces are removed.
+
+Default: 0
 
 tab-width
 ---------
