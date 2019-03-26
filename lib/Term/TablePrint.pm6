@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.4.0>;
+unit class Term::TablePrint:ver<1.4.1>;
 
 use Term::Choose           :choose, :choose-multi, :pause;
 use Term::Choose::LineFold :to-printwidth, :line-fold, :print-columns;

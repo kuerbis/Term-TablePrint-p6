@@ -1,6 +1,9 @@
 Revision history for Term::TablePrint
 
 
+1.4.1  2019-03-26
+        - Cleanup.
+
 1.4.0  2019-03-26
         - From ncurses to ANSI escapes.
         - Bugfix: removed two bindings.
