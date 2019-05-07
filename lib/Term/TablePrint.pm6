@@ -1,9 +1,9 @@
 use v6;
-unit class Term::TablePrint:ver<1.4.3>;
+unit class Term::TablePrint:ver<1.4.4>;
 
 use Term::Choose           :choose, :choose-multi, :pause;
-use Term::Choose::LineFold :to-printwidth, :line-fold, :print-columns;
-use Term::Choose::Screen   :ALL;
+use Term::Choose::LineFold;
+use Term::Choose::Screen   :hide-cursor, :show-cursor, :save-screen, :restore-screen, :clear, :num-threads, :get-term-size;
 use Term::Choose::Util     :insert-sep, :unicode-sprintf;
 
 has %!o;
@@ -49,7 +49,7 @@ method !_init_term {
     if %!o<save-screen> {
         save-screen;
     }
-    clear;
+    #clear;
     $!tc = Term::Choose.new( :mouse( %!o<mouse> ), :0hide-cursor );
 }
 
@@ -166,6 +166,7 @@ method !_recursive_code {
     my Int $old_row = 0;
     my Int $auto_jumped_to_row_0 = 2;
     my Int $row_is_expanded = 0;
+    clear();
 
     loop {
         if $term_w != get-term-size().[0] + 1 {
@@ -175,7 +176,8 @@ method !_recursive_code {
         }
         if ( %!o<keep-header> && ! $table.elems ) || ( ! %!o<keep-header> && $table.elems == 1 ) {
             # Choose
-            $!tc.pause( ( Any, |$table[0] ), :prompt( 'EMPTY!' ), :0layout, :undef( '<<' ) );
+            #$!tc.pause( ( Any, |$table[0] ), :prompt( 'EMPTY!' ), :0layout, :undef( '<<' ) );
+            $!tc.pause( ( $table[0], ), :prompt( 'EMPTY!' ), :0layout, :undef( '<<' ) );
             return;
         }
         %*ENV<TC_RESET_AUTO_UP> = 0;

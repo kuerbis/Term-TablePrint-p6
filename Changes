@@ -1,6 +1,9 @@
 Revision history for Term::TablePrint
 
 
+1.4.4  2019-05-07
+        - Update import.
+
 1.4.3  2019-04-02
         - Option 'save-screen': use the alternate screen
         - Bugfix in 'Terminal window is not wide enough'
