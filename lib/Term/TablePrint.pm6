@@ -149,10 +149,6 @@ method !_recursive_code {
     self!_copy_table( $table );
     self!_calc_col_width( $table );
     my $term_w = get-term-size().[0] + 1; # + 1 if not win32
-    $!tab_w = %!o<tab-width>;
-    if %!o<grid> && %!o<tab-width> %% 2 {
-        $!tab_w++;
-    }
     my $ok = self!_calc_avail_col_width( $term_w, $table );
     if ! $ok {
         return; #
