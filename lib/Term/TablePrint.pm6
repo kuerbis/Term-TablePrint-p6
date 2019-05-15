@@ -1,10 +1,10 @@
 use v6;
-unit class Term::TablePrint:ver<1.4.5>;
+unit class Term::TablePrint:ver<1.4.6>;
 
-use Term::Choose           :choose, :choose-multi, :pause;
+use Term::Choose;
 use Term::Choose::LineFold;
-use Term::Choose::Screen   :hide-cursor, :show-cursor, :save-screen, :restore-screen, :clear, :num-threads, :get-term-size;
-use Term::Choose::Util     :insert-sep, :unicode-sprintf;
+use Term::Choose::Screen;
+use Term::Choose::Util :insert-sep, :unicode-sprintf;
 
 has %!o;
 
@@ -16,12 +16,13 @@ has UInt       $.min-col-width     = 30;
 has UInt       $.progress-bar      = 5_000;
 has UInt       $.tab-width         = 2;
 has Int_0_or_1 $.choose-columns    = 0;
-has Int_0_or_1 $.grid              = 1;
 has Int_0_or_1 $.keep-header       = 1;
 has Int_0_or_1 $.loop              = 0; # private
 has Int_0_or_1 $.mouse             = 0;
 has Int_0_or_1 $.squash-spaces     = 0;
-has Int_0_or_1 $.save-screen       = 0;
+has Int_0_or_1 $.save-screen;           # 15.05.2019
+has Int_0_to_2 $.clear-screen      = 1;
+has Int_0_to_2 $.grid              = 1;
 has Int_0_to_2 $.table-expand      = 1;
 has Str        $.decimal-separator = '.';
 has Str        $.prompt            = '';
@@ -49,16 +50,15 @@ method !_init_term {
     if ! $!loop {
         hide-cursor();
     }
-    if %!o<save-screen> {
+    if %!o<clear-screen> == 2 {
         save-screen;
     }
-    #clear;
     $!tc = Term::Choose.new( :mouse( %!o<mouse> ), :0hide-cursor );
 }
 
 
 method !_end_term {
-    if %!o<save-screen> {
+    if %!o<clear-screen> == 2 {
         restore-screen;
     }
     if ! $!loop {
@@ -79,18 +79,26 @@ method print-table (
         UInt       :$progress-bar      = $!progress-bar,
         UInt       :$tab-width         = $!tab-width,
         Int_0_or_1 :$choose-columns    = $!choose-columns,
-        Int_0_or_1 :$grid              = $!grid,
         Int_0_or_1 :$keep-header       = $!keep-header,
         Int_0_or_1 :$mouse             = $!mouse,
         Int_0_or_1 :$squash-spaces     = $!squash-spaces,
-        Int_0_or_1 :$save-screen       = $!save-screen,
+        Int_0_or_1 :$save-screen       = $!save-screen, # 15.05.2019
+        Int_0_to_2 :$clear-screen      = $!clear-screen,
+        Int_0_to_2 :$grid              = $!grid,
         Int_0_to_2 :$table-expand      = $!table-expand,
         Str        :$decimal-separator = $!decimal-separator,
         Str        :$prompt            = $!prompt,
         Str        :$undef             = $!undef,
     ) {
+
+    #### 15.05.2019 ####
+    if $save-screen && ! $clear-screen.defined {
+        $clear-screen = 2;
+    }
+    ####################
+
     %!o = :$max-rows, :$min-col-width, :$progress-bar, :$tab-width, :$choose-columns, :$grid, :$keep-header,
-          :$mouse, :$squash-spaces, :$table-expand, :$decimal-separator, :$prompt, :$undef, :$save-screen;
+          :$mouse, :$squash-spaces, :$table-expand, :$decimal-separator, :$prompt, :$undef, :$clear-screen;
     self!_init_term();
     if ! @!orig_table.elems {
         $!tc.pause( ( 'Close with ENTER', ), :prompt( '"print-table": Empty table!' ) );
@@ -140,8 +148,13 @@ method !_recursive_code {
     my $table = []; #
     self!_copy_table( $table );
     self!_calc_col_width( $table );
-    my $term_w = self!_calc_avail_col_width( $table );
-    if ! $term_w {
+    my $term_w = get-term-size().[0] + 1; # + 1 if not win32
+    $!tab_w = %!o<tab-width>;
+    if %!o<grid> && %!o<tab-width> %% 2 {
+        $!tab_w++;
+    }
+    my $ok = self!_calc_avail_col_width( $term_w, $table );
+    if ! $ok {
         return; #
     }
     my Int $table_w = [+] |@!avail_w_cols, $!tab_w * @!avail_w_cols.end;
@@ -154,24 +167,31 @@ method !_recursive_code {
         @header.push: %!o<prompt>;
     }
     if %!o<keep-header> {
+        @header.push: self!_header_separator if %!o<grid> == 2;
         @header.push: $table.shift;
         @header.push: self!_header_separator if %!o<grid>;
     }
     else {
         $table.splice( 1, 0, self!_header_separator ) if %!o<grid>;
+        $table.unshift: self!_header_separator        if %!o<grid> == 2; # p5
     }
     if $!info_row {
         if print-columns( $!info_row ) > $table_w {
             $table.push: to-printwidth( $!info_row, $table_w - 3 ).[0] ~ '...';
         }
         else {
-            $table.push: $!info_row;
+            $table.push: $!info_row ~ ' ' x ( $table_w - $!info_row.chars ); #
         }
     }
     my Int $old_row = 0;
     my Int $auto_jumped_to_row_0 = 2;
     my Int $row_is_expanded = 0;
-    clear();
+    if %!o<clear-screen> {
+        clear();
+    }
+    else {
+        clr-to-bot();
+    }
 
     loop {
         if $term_w != get-term-size().[0] + 1 {
@@ -237,9 +257,26 @@ method !_recursive_code {
                 $row++;
             }
             else {
-                if %!o<grid> {
-                    next   if $row == 1;
-                    $row-- if $row > 1;
+                if %!o<grid> == 1 {
+                    if $row == 1 {
+                        #$row = 0;
+                        next;
+                    }
+                    if $row > 1 {
+                        $row--;
+                    }
+                }
+                elsif %!o<grid> == 2 { # p5
+                    if $row == 0 | 2 {
+                        #$row = 1;
+                        next;
+                    }
+                    if $row == 1 {
+                        $row--;
+                    }
+                    else {
+                        $row -= 2;
+                    }
                 }
             }
             self!_print_single_table_row( $row );
@@ -387,9 +424,8 @@ method !_calc_col_width ( $table ) {
 }
 
 
-method !_calc_avail_col_width( $table ) {
+method !_calc_avail_col_width( $term_w, $table ) {
     @!avail_w_cols = @!w_cols;
-    my $term_w = get-term-size().[0] + 1; # + 1 if not win32
     my Int $avail_w = $term_w - $!tab_w * @!avail_w_cols.end;
     my Int $sum = [+] @!avail_w_cols;
     if $sum < $avail_w {
@@ -452,7 +488,7 @@ method !_calc_avail_col_width( $table ) {
         }
         @!avail_w_cols = [ @tmp_cols_w ] if @tmp_cols_w.elems;
     }
-    return $term_w;
+    return 1;
 }
 
 
@@ -793,6 +829,14 @@ C<SpaceBar> and the C<Return> key) until the user confirms with the I<-ok-> menu
 
 Default: 0
 
+=head3 clear-screen
+
+0 - off
+
+1 - clears the screen before printing the table (default)
+
+2 - use the alternate screen (uses the control sequence C<1049>)
+
 =head2 decimal-separator
 
 If set, numbers use I<decimal-separator> as the decimal separator instead of the default decimal separator.
@@ -844,7 +888,26 @@ Default: 1
 
 =head2 grid
 
-If I<grid> is set to 1 lines separate the columns from each other and the header from the body.
+If I<grid> is set to 0, the table is shown with no grid.
+
+=begin code
+
+    .----------------------------.
+    |col1  col2     col3   col3  |
+    |....  .......  .....  ..... |
+    |....  .......  .....  ..... |
+    |....  .......  .....  ..... |
+    |....  .......  .....  ..... |
+    |....  .......  .....  ..... |
+    |....  .......  .....  ..... |
+    |....  .......  .....  ..... |
+    |....  .......  .....  ..... |
+    |                            |
+    '----------------------------'
+
+=end code
+
+If I<grid> is set to 1, lines separate the columns from each other and the header from the body.
 
 =begin code
 
@@ -863,24 +926,7 @@ If I<grid> is set to 1 lines separate the columns from each other and the header
 
 =end code
 
-If set to 0 the table is shown with no grid.
-
-=begin code
-
-    .----------------------------.
-    |col1  col2     col3   col3  |
-    |....  .......  .....  ..... |
-    |....  .......  .....  ..... |
-    |....  .......  .....  ..... |
-    |....  .......  .....  ..... |
-    |....  .......  .....  ..... |
-    |....  .......  .....  ..... |
-    |....  .......  .....  ..... |
-    |....  .......  .....  ..... |
-    |                            |
-    '----------------------------'
-
-=end code
+I<grid> set to 2 is like I<grid> set to 1 plus a separator line on top of the header row.
 
 Default: 1
 
@@ -908,11 +954,9 @@ Set the I<mouse> mode (see option C<mouse> in L<Term::Choose|https://github.com/
 
 Default: 0
 
-=head2 save-screen
+=head2 save-screen DEPRECATED
 
-If set to C<1> the alternate screen is used (control sequence C<1049>).
-
-Default: 0
+Deprecated. To use the alternate set I<clear-screen> to C<2>.
 
 =head2 progress-bar
 

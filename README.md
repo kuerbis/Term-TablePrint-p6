@@ -120,6 +120,14 @@ If *choose-columns* is set to 1, the user can choose which columns to print. Col
 
 Default: 0
 
+### clear-screen
+
+0 - off
+
+1 - clears the screen before printing the table (default)
+
+2 - use the alternate screen (uses the control sequence `1049`)
+
 decimal-separator
 -----------------
 
@@ -165,7 +173,22 @@ Default: 1
 grid
 ----
 
-If *grid* is set to 1 lines separate the columns from each other and the header from the body.
+If *grid* is set to 0, the table is shown with no grid.
+
+        .----------------------------.
+        |col1  col2     col3   col3  |
+        |....  .......  .....  ..... |
+        |....  .......  .....  ..... |
+        |....  .......  .....  ..... |
+        |....  .......  .....  ..... |
+        |....  .......  .....  ..... |
+        |....  .......  .....  ..... |
+        |....  .......  .....  ..... |
+        |....  .......  .....  ..... |
+        |                            |
+        '----------------------------'
+
+If *grid* is set to 1, lines separate the columns from each other and the header from the body.
 
         .----------------------------.
         |col1 | col2   | col3 | col3 |
@@ -180,20 +203,7 @@ If *grid* is set to 1 lines separate the columns from each other and the header 
         |.... | ...... | .... | .... |
         '----------------------------'
 
-If set to 0 the table is shown with no grid.
-
-        .----------------------------.
-        |col1  col2     col3   col3  |
-        |....  .......  .....  ..... |
-        |....  .......  .....  ..... |
-        |....  .......  .....  ..... |
-        |....  .......  .....  ..... |
-        |....  .......  .....  ..... |
-        |....  .......  .....  ..... |
-        |....  .......  .....  ..... |
-        |....  .......  .....  ..... |
-        |                            |
-        '----------------------------'
+*grid* set to 2 is like *grid* set to 1 plus a separator line on top of the header row.
 
 Default: 1
 
@@ -222,12 +232,10 @@ Set the *mouse* mode (see option `mouse` in [Term::Choose](https://github.com/ku
 
 Default: 0
 
-save-screen
------------
+save-screen DEPRECATED
+----------------------
 
-If set to `1` the alternate screen is used (control sequence `1049`).
-
-Default: 0
+Deprecated. To use the alternate set *clear-screen* to `2`.
 
 progress-bar
 ------------

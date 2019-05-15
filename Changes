@@ -1,6 +1,14 @@
 Revision history for Term::TablePrint
 
 
+1.4.6  2019-05-15
+        - New option clear-screen.
+        - Option save-screen deprecated.
+        - Additional value for the option grid.
+
+1.4.5  2019-05-15
+        - Option loop.
+
 1.4.5  2019-05-15
         - Option loop.
 
