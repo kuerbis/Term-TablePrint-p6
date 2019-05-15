@@ -1,6 +1,9 @@
 Revision history for Term::TablePrint
 
 
+1.4.5  2019-05-15
+        - Option loop.
+
 1.4.4  2019-05-07
         - Update import.
 

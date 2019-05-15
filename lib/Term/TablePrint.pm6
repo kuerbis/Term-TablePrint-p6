@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.4.4>;
+unit class Term::TablePrint:ver<1.4.5>;
 
 use Term::Choose           :choose, :choose-multi, :pause;
 use Term::Choose::LineFold;
@@ -18,6 +18,7 @@ has UInt       $.tab-width         = 2;
 has Int_0_or_1 $.choose-columns    = 0;
 has Int_0_or_1 $.grid              = 1;
 has Int_0_or_1 $.keep-header       = 1;
+has Int_0_or_1 $.loop              = 0; # private
 has Int_0_or_1 $.mouse             = 0;
 has Int_0_or_1 $.squash-spaces     = 0;
 has Int_0_or_1 $.save-screen       = 0;
@@ -45,7 +46,9 @@ has Term::Choose $!tc;
 
 
 method !_init_term {
-    hide-cursor();
+    if ! $!loop {
+        hide-cursor();
+    }
     if %!o<save-screen> {
         save-screen;
     }
@@ -58,7 +61,9 @@ method !_end_term {
     if %!o<save-screen> {
         restore-screen;
     }
-    show-cursor();
+    if ! $!loop {
+        show-cursor();
+    }
 }
 
 
@@ -176,7 +181,6 @@ method !_recursive_code {
         }
         if ( %!o<keep-header> && ! $table.elems ) || ( ! %!o<keep-header> && $table.elems == 1 ) {
             # Choose
-            #$!tc.pause( ( Any, |$table[0] ), :prompt( 'EMPTY!' ), :0layout, :undef( '<<' ) );
             $!tc.pause( ( $table[0], ), :prompt( 'EMPTY!' ), :0layout, :undef( '<<' ) );
             return;
         }
