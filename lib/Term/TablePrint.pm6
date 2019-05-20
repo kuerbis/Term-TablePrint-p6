@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.4.6>;
+unit class Term::TablePrint:ver<1.4.7>;
 
 use Term::Choose;
 use Term::Choose::LineFold;
@@ -186,7 +186,7 @@ method !_recursive_code {
         clear();
     }
     else {
-        clr-to-bot();
+        clr-lines-to-bot();
     }
 
     loop {

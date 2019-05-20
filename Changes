@@ -1,6 +1,9 @@
 Revision history for Term::TablePrint
 
 
+1.4.7  2019-05-20
+        - From clr-to-bot to clr-lines-to-bot.
+
 1.4.6  2019-05-15
         - New option clear-screen.
         - Option save-screen deprecated.
