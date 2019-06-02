@@ -4,13 +4,13 @@
   ],
   "build-depends" : [ ],
   "depends" : [
-    "Term::Choose:ver<1.5.6+>",
-    "Term::Choose::Util:ver<1.2.7+>"
+    "Term::Choose:ver<1.5.7+>",
+    "Term::Choose::Util:ver<1.2.8+>"
   ],
   "description" : "Print a table to the terminal and browse it interactively.",
   "license" : "Artistic-2.0",
   "name" : "Term::TablePrint",
-  "perl" : "6.c",
+  "perl" : "6.d",
   "provides" : {
     "Term::TablePrint" : "lib/Term/TablePrint.pm6"
   },
@@ -25,5 +25,5 @@
   "test-depends" : [
     "Test"
   ],
-  "version" : "1.4.7"
+  "version" : "1.4.8"
 }

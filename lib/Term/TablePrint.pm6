@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.4.7>;
+unit class Term::TablePrint:ver<1.4.8>;
 
 use Term::Choose;
 use Term::Choose::LineFold;
@@ -48,10 +48,10 @@ has Term::Choose $!tc;
 
 method !_init_term {
     if ! $!loop {
-        hide-cursor();
+        print hide-cursor;
     }
     if %!o<clear-screen> == 2 {
-        save-screen;
+        print save-screen;
     }
     $!tc = Term::Choose.new( :mouse( %!o<mouse> ), :0hide-cursor );
 }
@@ -59,10 +59,10 @@ method !_init_term {
 
 method !_end_term {
     if %!o<clear-screen> == 2 {
-        restore-screen;
+        print restore-screen;
     }
     if ! $!loop {
-        show-cursor();
+        print show-cursor;
     }
 }
 
@@ -169,7 +169,7 @@ method !_recursive_code {
     }
     else {
         $table.splice( 1, 0, self!_header_separator ) if %!o<grid>;
-        $table.unshift: self!_header_separator        if %!o<grid> == 2; # p5
+        $table.unshift: self!_header_separator        if %!o<grid> == 2;
     }
     if $!info_row {
         if print-columns( $!info_row ) > $table_w {
@@ -183,10 +183,10 @@ method !_recursive_code {
     my Int $auto_jumped_to_row_0 = 2;
     my Int $row_is_expanded = 0;
     if %!o<clear-screen> {
-        clear();
+        print clear;
     }
     else {
-        clr-lines-to-bot();
+        print clr-lines-to-bot;
     }
 
     loop {
@@ -210,7 +210,7 @@ method !_recursive_code {
             return;
         }
         if $row < 0 {
-            clear();
+            print clear;
             self!_init_progress_bar();
             next;   # choose: ll + changed window size: returns -1;
         }
@@ -262,7 +262,7 @@ method !_recursive_code {
                         $row--;
                     }
                 }
-                elsif %!o<grid> == 2 { # p5
+                elsif %!o<grid> == 2 {
                     if $row == 0 | 2 {
                         #$row = 1;
                         next;
@@ -831,7 +831,7 @@ Default: 0
 
 1 - clears the screen before printing the table (default)
 
-2 - use the alternate screen (uses the control sequence C<1049>)
+2 - use the alternate screen
 
 =head2 decimal-separator
 
@@ -952,7 +952,7 @@ Default: 0
 
 =head2 save-screen DEPRECATED
 
-Deprecated. To use the alternate set I<clear-screen> to C<2>.
+Deprecated. To use the alternate screen set I<clear-screen> to C<2>.
 
 =head2 progress-bar
 

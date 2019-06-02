@@ -1,6 +1,10 @@
 Revision history for Term::TablePrint
 
 
+1.4.8  2019-06-02
+        - Escape sequence subroutines without print.
+        - Perl6 minimum version 6.d.
+
 1.4.7  2019-05-20
         - From clr-to-bot to clr-lines-to-bot.
 

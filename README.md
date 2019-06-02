@@ -126,7 +126,7 @@ Default: 0
 
 1 - clears the screen before printing the table (default)
 
-2 - use the alternate screen (uses the control sequence `1049`)
+2 - use the alternate screen
 
 decimal-separator
 -----------------
@@ -235,7 +235,7 @@ Default: 0
 save-screen DEPRECATED
 ----------------------
 
-Deprecated. To use the alternate set *clear-screen* to `2`.
+Deprecated. To use the alternate screen set *clear-screen* to `2`.
 
 progress-bar
 ------------
