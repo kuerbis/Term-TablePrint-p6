@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.4.8>;
+unit class Term::TablePrint:ver<1.4.9>;
 
 use Term::Choose;
 use Term::Choose::LineFold;
@@ -128,12 +128,12 @@ method print-table (
     }
     if %!o<choose-columns> {
         @!chosen_cols_idx = self!_choose_columns( @!orig_table[0] );
-        if @!chosen_cols_idx.elems && ! @!chosen_cols_idx[0].defined {
+        if ! @!chosen_cols_idx[0].defined {
             self!_end_term();
             return;
         }
     }
-    if ! @!chosen_cols_idx.elems {
+    else {
        @!chosen_cols_idx = 0 .. @!orig_table[0].end;
     }
     self!_init_progress_bar();
@@ -574,29 +574,29 @@ method !_choose_columns ( @avail_cols ) {
     my Str $init_prompt = 'Columns: ';
     my Str $ok = '-ok-';
     my Str @pre = ( Str, $ok );
-    my Int @col_idxs;
+    my Int @chosen_idxs;
     my @cols = @avail_cols.map( { $_ // %!o<undef> } );
 
     loop {
-        my @chosen_cols = @col_idxs.list ?? @cols[@col_idxs] !! '*';
+        my @chosen_cols = @chosen_idxs.list ?? @cols[@chosen_idxs] !! '*';
         my Str $prompt = $init_prompt ~ @chosen_cols.join: ', ';
         my @choices = |@pre, |@cols;
         # Choose
         my Int @idx = $!tc.choose-multi( @choices, :prompt( $prompt ), :1index, :lf( 0, $init_prompt.chars ),
                                                    :meta-items( |^@pre ), :undef( '<<' ), :2include-highlighted );
-        if ! @idx[0].defined || @idx[0] == 0 {
-            if @col_idxs.elems {
-                @col_idxs = [];
+        if ! @idx[0] {
+            if @chosen_idxs.elems {
+                @chosen_idxs = [];
                 next;
             }
             return;
         }
         elsif @choices[@idx[0]].defined && @choices[@idx[0]] eq $ok {
             @idx.shift;
-            @col_idxs.append: @idx >>->> @pre.elems;
-            return @col_idxs;
+            @chosen_idxs.append: @idx >>->> @pre.elems;
+            return @chosen_idxs.elems ?? @chosen_idxs !! ^@avail_cols; # p5
         }
-        @col_idxs.append: @idx >>->> @pre.elems;
+        @chosen_idxs.append: @idx >>->> @pre.elems;
     }
 }
 

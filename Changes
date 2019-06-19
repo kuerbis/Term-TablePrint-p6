@@ -1,6 +1,9 @@
 Revision history for Term::TablePrint
 
 
+1.4.9  2019-06-19
+        - Bugfix choose columns.
+
 1.4.8  2019-06-02
         - Escape sequence subroutines without print.
         - Perl6 minimum version 6.d.
