@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.4.9>;
+unit class Term::TablePrint:ver<1.5.0>;
 
 use Term::Choose;
 use Term::Choose::LineFold;
@@ -16,6 +16,7 @@ has UInt       $.min-col-width     = 30;
 has UInt       $.progress-bar      = 5_000;
 has UInt       $.tab-width         = 2;
 has Int_0_or_1 $.choose-columns    = 0;
+has Int_0_or_1 $.color             = 0;
 has Int_0_or_1 $.keep-header       = 1;
 has Int_0_or_1 $.loop              = 0; # private
 has Int_0_or_1 $.mouse             = 0;
@@ -79,6 +80,7 @@ method print-table (
         UInt       :$progress-bar      = $!progress-bar,
         UInt       :$tab-width         = $!tab-width,
         Int_0_or_1 :$choose-columns    = $!choose-columns,
+        Int_0_or_1 :$color             = $!color,
         Int_0_or_1 :$keep-header       = $!keep-header,
         Int_0_or_1 :$mouse             = $!mouse,
         Int_0_or_1 :$squash-spaces     = $!squash-spaces,
@@ -97,7 +99,7 @@ method print-table (
     }
     ####################
 
-    %!o = :$max-rows, :$min-col-width, :$progress-bar, :$tab-width, :$choose-columns, :$grid, :$keep-header,
+    %!o = :$max-rows, :$min-col-width, :$progress-bar, :$tab-width, :$choose-columns, :$grid, :$keep-header, :$color,
           :$mouse, :$squash-spaces, :$table-expand, :$decimal-separator, :$prompt, :$undef, :$clear-screen;
     self!_init_term();
     if ! @!orig_table.elems {
@@ -127,14 +129,14 @@ method print-table (
         @!rows_idx = 0 .. @!orig_table.end;
     }
     if %!o<choose-columns> {
-        @!chosen_cols_idx = self!_choose_columns( @!orig_table[0] );
+        @!chosen_cols_idx = self!_choose_columns();
         if ! @!chosen_cols_idx[0].defined {
             self!_end_term();
             return;
         }
     }
     else {
-       @!chosen_cols_idx = 0 .. @!orig_table[0].end;
+       @!chosen_cols_idx = ^@!orig_table[0];
     }
     self!_init_progress_bar();
     self!_split_work_for_threads();
@@ -204,7 +206,7 @@ method !_recursive_code {
         # Choose
         my Int $row = $!tc.choose(
             $table,
-            :prompt( @header.join: "\n" ), :ll( $table_w ), :default( $old_row ), :1index, :2layout
+            :prompt( @header.join: "\n" ), :ll( $table_w ), :default( $old_row ), :1index, :2layout, :color( %!o<color> )
         );
         if ! $row.defined {
             return;
@@ -297,14 +299,20 @@ method !_print_single_table_row ( Int $row ) {
         if $col_name ~~ Buf {
             $col_name = $col_name.gist;
         }
+        if %!o<color> { # elsif
+            $col_name.=subst( / \e \[ <[\d;]>* m /, '', :g ); # msg
+        }
         $col_name.=subst( / \t /,  ' ', :g );
         $col_name.=subst( / \v+ /,  '  ', :g );
         $col_name.=subst( / <:Cc+:Noncharacter_Code_Point+:Cs> /, '', :g );
         my Str $key = to-printwidth( $col_name, $key_w, False ).[0];
         my $cell = @!orig_table[$row][$col];
+        if %!o<color> {
+            $cell.=subst( / \e \[ <[\d;]>* m /, '', :g ); # msg
+        }
         my Str $sep = $separator;
         @lines.push: ' ';
-        for line-fold( $cell, $col_w ) -> $line {
+        for line-fold( $cell, $col_w ) -> $line { # color ?
             @lines.push: sprintf "%*.*s%*s%s", $key_w xx 2, $key, $sep_w, $sep, $line;
             $key = '' if $key;
             $sep = '' if $sep;
@@ -333,6 +341,10 @@ method !_copy_table ( $table ) {
                     my $str = ( @!orig_table.AT-POS($row).AT-POS($col) // %!o<undef> );  # this is where the copying happens
                     if $str ~~ Buf {
                         $str = $str.gist;
+                    }
+                    if %!o<color> { # elsif
+                        $str.=subst( / \x[feff] /, '', :g );
+                        $str.=subst( / \e \[ <[\d;]>* m /, "\x[feff]", :g ); # msg
                     }
                     if %!o<squash-spaces> {
                         $str.=subst( / ^ <:Space>+ /, '', :g );
@@ -543,6 +555,15 @@ method !_table_row_to_string( $table ) {
                     else {
                         $str = $str ~ unicode-sprintf( $table.AT-POS($row).AT-POS($col), @!avail_w_cols.AT-POS($col), 0, @cache );
                     }
+                    if %!o<color> && @!orig_table.AT-POS($row).AT-POS($col).defined { #
+                        my @color = @!orig_table.AT-POS($row).AT-POS($col).comb( / \e \[ <[\d;]>* m / );
+                        if @color.elems {
+                            $str.=subst( / \x[feff] /, { @color.shift }, :g );
+                            if @color.elems {
+                                $str = $str ~ @color[*-1];
+                            }
+                        }
+                    }
                     if $col != @!avail_w_cols.end {
                         $str = $str ~ $tab;
                     }
@@ -570,16 +591,15 @@ method !_table_row_to_string( $table ) {
 }
 
 
-method !_choose_columns ( @avail_cols ) {
+method !_choose_columns {
     my Str $init_prompt = 'Columns: ';
     my Str $ok = '-ok-';
     my Str @pre = ( Str, $ok );
     my Int @chosen_idxs;
-    my @cols = @avail_cols.map( { $_ // %!o<undef> } );
+    my @cols = @!orig_table[0].map( { $_ // %!o<undef> } );
 
     loop {
-        my @chosen_cols = @chosen_idxs.list ?? @cols[@chosen_idxs] !! '*';
-        my Str $prompt = $init_prompt ~ @chosen_cols.join: ', ';
+        my Str $prompt = $init_prompt ~ ( @chosen_idxs.list ?? @cols[@chosen_idxs] !! '*' ).join: ', ';
         my @choices = |@pre, |@cols;
         # Choose
         my Int @idx = $!tc.choose-multi( @choices, :prompt( $prompt ), :1index, :lf( 0, $init_prompt.chars ),
@@ -594,7 +614,7 @@ method !_choose_columns ( @avail_cols ) {
         elsif @choices[@idx[0]].defined && @choices[@idx[0]] eq $ok {
             @idx.shift;
             @chosen_idxs.append: @idx >>->> @pre.elems;
-            return @chosen_idxs.elems ?? @chosen_idxs !! ^@avail_cols; # p5
+            return @chosen_idxs.elems ?? @chosen_idxs !! ^@!orig_table[0]; # p5
         }
         @chosen_idxs.append: @idx >>->> @pre.elems;
     }
@@ -833,6 +853,14 @@ Default: 0
 
 2 - use the alternate screen
 
+=head3 color
+
+If this option is set to C<1>, SRG ANSI escape sequences can be used to color the screen output.
+
+0 - off (default)
+
+1 - on
+
 =head2 decimal-separator
 
 If set, numbers use I<decimal-separator> as the decimal separator instead of the default decimal separator.
@@ -1015,6 +1043,15 @@ C<Term::TablePrint> uses multithreading when preparing the list for the output; 
 with the environment variable C<TC_NUM_THREADS>.
 
 =head1 REQUIREMENTS
+
+=head2 tput
+
+The control of the cursor location, the highlighting of the cursor position and the marked elements and other options on
+the terminal is done via escape sequences.
+
+C<tput> is used to get the appropriate escape sequences.
+
+Escape sequences to handle mouse input are hardcoded.
 
 =head2 Monospaced font
 

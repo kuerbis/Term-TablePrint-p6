@@ -1,6 +1,10 @@
 Revision history for Term::TablePrint
 
 
+1.5.0  2019-07-09
+        - New option color.
+        - Code refactoring.
+
 1.4.9  2019-06-19
         - Bugfix choose columns.
 

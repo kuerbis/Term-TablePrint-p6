@@ -4,8 +4,8 @@
   ],
   "build-depends" : [ ],
   "depends" : [
-    "Term::Choose:ver<1.5.7+>",
-    "Term::Choose::Util:ver<1.2.8+>"
+    "Term::Choose:ver<1.5.9+>",
+    "Term::Choose::Util:ver<1.2.9+>"
   ],
   "description" : "Print a table to the terminal and browse it interactively.",
   "license" : "Artistic-2.0",
@@ -25,5 +25,5 @@
   "test-depends" : [
     "Test"
   ],
-  "version" : "1.4.9"
+  "version" : "1.5.0"
 }

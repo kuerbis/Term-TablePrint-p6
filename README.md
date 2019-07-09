@@ -128,6 +128,14 @@ Default: 0
 
 2 - use the alternate screen
 
+### color
+
+If this option is set to `1`, SRG ANSI escape sequences can be used to color the screen output.
+
+0 - off (default)
+
+1 - on
+
 decimal-separator
 -----------------
 
@@ -297,6 +305,15 @@ multithreading
 
 REQUIREMENTS
 ============
+
+tput
+----
+
+The control of the cursor location, the highlighting of the cursor position and the marked elements and other options on the terminal is done via escape sequences.
+
+`tput` is used to get the appropriate escape sequences.
+
+Escape sequences to handle mouse input are hardcoded.
 
 Monospaced font
 ---------------
