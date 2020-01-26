@@ -116,7 +116,7 @@ String displayed above the table.
 choose-columns
 --------------
 
-If *choose-columns* is set to 1, the user can choose which columns to print. Columns can be added (with the `SpaceBar` and the `Return` key) until the user confirms with the *-ok-* menu entry.
+If *choose-columns* is set to `1`, the user can choose which columns to print. Columns can be added (with the `SpaceBar` and the `Return` key) until the user confirms with the *-ok-* menu entry.
 
 Default: 0
 
@@ -130,11 +130,13 @@ Default: 0
 
 ### color
 
-If this option is set to `1`, SRG ANSI escape sequences can be used to color the screen output.
+If this option is enabled, SRG ANSI escape sequences can be used to color the screen output.
 
 0 - off (default)
 
-1 - on
+1 - on (current selected element not colored)
+
+2 - on (current selected element colored)
 
 decimal-separator
 -----------------
@@ -148,7 +150,7 @@ Default: . (dot)
 keep-header
 -----------
 
-If *keep-header* is set to 0, the table header is shown on top of the first page.
+If *keep-header* is set to `0`, the table header is shown on top of the first page.
 
         .----------------------------.    .----------------------------.    .----------------------------.
         |col1   col2     col3   col3 |    |.....  .......  .....  .....|    |.....  .......  .....  .....|
@@ -162,7 +164,7 @@ If *keep-header* is set to 0, the table header is shown on top of the first page
         | 1/3                        |    | 2/3                        |    | 3/3                        |
         '----------------------------'    '----------------------------'    '----------------------------'
 
-If *keep-header* is set to 1, the table header is shown on top of each page.
+If *keep-header* is set to `1`, the table header is shown on top of each page.
 
         .----------------------------.    .----------------------------.    .----------------------------.
         |col1   col2     col3   col3 |    |col1   col2     col3   col4 |    |col1   col2     col3   col4 |
@@ -181,7 +183,7 @@ Default: 1
 grid
 ----
 
-If *grid* is set to 0, the table is shown with no grid.
+If *grid* is set to `0`, the table is shown with no grid.
 
         .----------------------------.
         |col1  col2     col3   col3  |
@@ -196,7 +198,7 @@ If *grid* is set to 0, the table is shown with no grid.
         |                            |
         '----------------------------'
 
-If *grid* is set to 1, lines separate the columns from each other and the header from the body.
+If *grid* is set to `1`, lines separate the columns from each other and the header from the body.
 
         .----------------------------.
         |col1 | col2   | col3 | col3 |
@@ -211,7 +213,7 @@ If *grid* is set to 1, lines separate the columns from each other and the header
         |.... | ...... | .... | .... |
         '----------------------------'
 
-*grid* set to 2 is like *grid* set to 1 plus a separator line on top of the header row.
+*grid* set to `2` is like *grid* set to `1` plus a separator line on top of the header row.
 
 Default: 1
 
@@ -220,7 +222,7 @@ max-rows
 
 Set the maximum number of used table rows. The used table rows are kept in memory.
 
-To disable the automatic limit set *max-rows* to 0.
+To disable the automatic limit set *max-rows* to `0`.
 
 If the number of table rows is equal to or higher than *max-rows*, the last row of the output says `REACHED LIMIT "MAX_ROWS": $limit` or `=LIMIT= $limit` if the previous doesn't fit in the row.
 
@@ -284,7 +286,7 @@ If the option *table-expand* is set to `1` or `2` and `Return` is pressed, the s
         |.... | ...... | .... | .... |        |                            |
         '----------------------------'        '----------------------------'
 
-If *table-expand* is set to 0, the cursor jumps to the to first row (if not already there) when `Return` is pressed.
+If *table-expand* is set to `0`, the cursor jumps to the to first row (if not already there) when `Return` is pressed.
 
 Default: 1
 
@@ -333,7 +335,7 @@ Matthäus Kiem <cuer2s@gmail.com>
 LICENSE AND COPYRIGHT
 =====================
 
-Copyright 2016-2019 Matthäus Kiem.
+Copyright 2016-2020 Matthäus Kiem.
 
 This library is free software; you can redistribute it and/or modify it under the Artistic License 2.0.
 

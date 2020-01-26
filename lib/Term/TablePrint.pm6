@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.5.0>;
+unit class Term::TablePrint:ver<1.5.1>;
 
 use Term::Choose;
 use Term::Choose::LineFold;
@@ -16,13 +16,13 @@ has UInt       $.min-col-width     = 30;
 has UInt       $.progress-bar      = 5_000;
 has UInt       $.tab-width         = 2;
 has Int_0_or_1 $.choose-columns    = 0;
-has Int_0_or_1 $.color             = 0;
 has Int_0_or_1 $.keep-header       = 1;
 has Int_0_or_1 $.loop              = 0; # private
 has Int_0_or_1 $.mouse             = 0;
 has Int_0_or_1 $.squash-spaces     = 0;
 has Int_0_or_1 $.save-screen;           # 15.05.2019
 has Int_0_to_2 $.clear-screen      = 1;
+has Int_0_to_2 $.color             = 0;
 has Int_0_to_2 $.grid              = 1;
 has Int_0_to_2 $.table-expand      = 1;
 has Str        $.decimal-separator = '.';
@@ -80,12 +80,12 @@ method print-table (
         UInt       :$progress-bar      = $!progress-bar,
         UInt       :$tab-width         = $!tab-width,
         Int_0_or_1 :$choose-columns    = $!choose-columns,
-        Int_0_or_1 :$color             = $!color,
         Int_0_or_1 :$keep-header       = $!keep-header,
         Int_0_or_1 :$mouse             = $!mouse,
         Int_0_or_1 :$squash-spaces     = $!squash-spaces,
         Int_0_or_1 :$save-screen       = $!save-screen, # 15.05.2019
         Int_0_to_2 :$clear-screen      = $!clear-screen,
+        Int_0_to_2 :$color             = $!color,
         Int_0_to_2 :$grid              = $!grid,
         Int_0_to_2 :$table-expand      = $!table-expand,
         Str        :$decimal-separator = $!decimal-separator,
@@ -553,7 +553,7 @@ method !_table_row_to_string( $table ) {
                         }
                     }
                     else {
-                        $str = $str ~ unicode-sprintf( $table.AT-POS($row).AT-POS($col), @!avail_w_cols.AT-POS($col), 0, @cache );
+                        $str = $str ~ unicode-sprintf( $table.AT-POS($row).AT-POS($col), @!avail_w_cols.AT-POS($col), @cache );
                     }
                     if %!o<color> && @!orig_table.AT-POS($row).AT-POS($col).defined { #
                         my @color = @!orig_table.AT-POS($row).AT-POS($col).comb( / \e \[ <[\d;]>* m / );
@@ -840,7 +840,7 @@ String displayed above the table.
 
 =head2 choose-columns
 
-If I<choose-columns> is set to 1, the user can choose which columns to print. Columns can be added (with the
+If I<choose-columns> is set to C<1>, the user can choose which columns to print. Columns can be added (with the
 C<SpaceBar> and the C<Return> key) until the user confirms with the I<-ok-> menu entry.
 
 Default: 0
@@ -855,11 +855,13 @@ Default: 0
 
 =head3 color
 
-If this option is set to C<1>, SRG ANSI escape sequences can be used to color the screen output.
+If this option is enabled, SRG ANSI escape sequences can be used to color the screen output.
 
 0 - off (default)
 
-1 - on
+1 - on (current selected element not colored)
+
+2 - on (current selected element colored)
 
 =head2 decimal-separator
 
@@ -872,7 +874,7 @@ Default: . (dot)
 
 =head2 keep-header
 
-If I<keep-header> is set to 0, the table header is shown on top of the first page.
+If I<keep-header> is set to C<0>, the table header is shown on top of the first page.
 
 =begin code
 
@@ -890,7 +892,7 @@ If I<keep-header> is set to 0, the table header is shown on top of the first pag
 
 =end code
 
-If I<keep-header> is set to 1, the table header is shown on top of each page.
+If I<keep-header> is set to C<1>, the table header is shown on top of each page.
 
 =begin code
 
@@ -912,7 +914,7 @@ Default: 1
 
 =head2 grid
 
-If I<grid> is set to 0, the table is shown with no grid.
+If I<grid> is set to C<0>, the table is shown with no grid.
 
 =begin code
 
@@ -931,7 +933,7 @@ If I<grid> is set to 0, the table is shown with no grid.
 
 =end code
 
-If I<grid> is set to 1, lines separate the columns from each other and the header from the body.
+If I<grid> is set to C<1>, lines separate the columns from each other and the header from the body.
 
 =begin code
 
@@ -950,7 +952,7 @@ If I<grid> is set to 1, lines separate the columns from each other and the heade
 
 =end code
 
-I<grid> set to 2 is like I<grid> set to 1 plus a separator line on top of the header row.
+I<grid> set to C<2> is like I<grid> set to C<1> plus a separator line on top of the header row.
 
 Default: 1
 
@@ -958,7 +960,7 @@ Default: 1
 
 Set the maximum number of used table rows. The used table rows are kept in memory.
 
-To disable the automatic limit set I<max-rows> to 0.
+To disable the automatic limit set I<max-rows> to C<0>.
 
 If the number of table rows is equal to or higher than I<max-rows>, the last row of the output says
 C<REACHED LIMIT "MAX_ROWS": $limit> or C<=LIMIT= $limit> if the previous doesn't fit in the row.
@@ -1025,7 +1027,7 @@ the first row will not be expanded.
 
 =end code
 
-If I<table-expand> is set to 0, the cursor jumps to the to first row (if not already there) when C<Return> is pressed.
+If I<table-expand> is set to C<0>, the cursor jumps to the to first row (if not already there) when C<Return> is pressed.
 
 Default: 1
 
@@ -1069,7 +1071,7 @@ Matthäus Kiem <cuer2s@gmail.com>
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright 2016-2019 Matthäus Kiem.
+Copyright 2016-2020 Matthäus Kiem.
 
 This library is free software; you can redistribute it and/or modify it under the Artistic License 2.0.
 

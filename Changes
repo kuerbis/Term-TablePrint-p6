@@ -1,6 +1,9 @@
 Revision history for Term::TablePrint
 
 
+1.5.1  2020-01-26
+        - Set the option color to 2 to enable colors also for the current selected item.
+
 1.5.0  2019-07-09
         - New option color.
         - Code refactoring.
