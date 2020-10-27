@@ -285,6 +285,11 @@ If *table-expand* is set to `0`, the cursor jumps to the to first row (if not al
 
 Default: 1
 
+table-name
+----------
+
+If set (string), *table_name* is added in the bottom line.
+
 undef
 -----
 

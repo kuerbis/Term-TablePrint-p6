@@ -1021,6 +1021,10 @@ If I<table-expand> is set to C<0>, the cursor jumps to the to first row (if not 
 
 Default: 1
 
+=head2 table-name
+
+If set (string), I<table_name> is added in the bottom line.
+
 =head2 undef
 
 Set the string that will be shown on the screen instead of an undefined field.
