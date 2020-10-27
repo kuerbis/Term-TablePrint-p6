@@ -1,6 +1,11 @@
 Revision history for Term::TablePrint
 
 
+1.5.2  2020-10-27
+        - Removed deprecated option 'save-screen'.
+        - New option 'table-name'.
+        - Bugfix in choose_columns.
+
 1.5.1  2020-01-26
         - Set the option color to 2 to enable colors also for the current selected item.
 
@@ -139,7 +144,7 @@ Revision history for Term::TablePrint
         - Pod: example, environment variables, requirements
 
 0.023   2017-05-15
-        - Pod: show the different format settings graphically (#2)
+        - Pod: show the different format settings graphically [GH #2 timo]
 
 0.022   2017-05-14
         - Bugfix not_a_number

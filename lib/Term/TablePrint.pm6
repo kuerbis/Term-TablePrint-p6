@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.5.1>;
+unit class Term::TablePrint:ver<1.5.2>;
 
 use Term::Choose;
 use Term::Choose::LineFold;
@@ -20,12 +20,12 @@ has Int_0_or_1 $.keep-header       = 1;
 has Int_0_or_1 $.loop              = 0; # private
 has Int_0_or_1 $.mouse             = 0;
 has Int_0_or_1 $.squash-spaces     = 0;
-has Int_0_or_1 $.save-screen;           # 15.05.2019
 has Int_0_to_2 $.clear-screen      = 1;
 has Int_0_to_2 $.color             = 0;
 has Int_0_to_2 $.grid              = 1;
 has Int_0_to_2 $.table-expand      = 1;
 has Str        $.decimal-separator = '.';
+has Str        $.table-name        = '';
 has Str        $.prompt            = '';
 has Str        $.undef             = '';
 
@@ -83,24 +83,17 @@ method print-table (
         Int_0_or_1 :$keep-header       = $!keep-header,
         Int_0_or_1 :$mouse             = $!mouse,
         Int_0_or_1 :$squash-spaces     = $!squash-spaces,
-        Int_0_or_1 :$save-screen       = $!save-screen, # 15.05.2019
         Int_0_to_2 :$clear-screen      = $!clear-screen,
         Int_0_to_2 :$color             = $!color,
         Int_0_to_2 :$grid              = $!grid,
         Int_0_to_2 :$table-expand      = $!table-expand,
         Str        :$decimal-separator = $!decimal-separator,
+        Str        :$table-name        = $!table-name,
         Str        :$prompt            = $!prompt,
         Str        :$undef             = $!undef,
     ) {
-
-    #### 15.05.2019 ####
-    if $save-screen && ! $clear-screen.defined {
-        $clear-screen = 2;
-    }
-    ####################
-
     %!o = :$max-rows, :$min-col-width, :$progress-bar, :$tab-width, :$choose-columns, :$grid, :$keep-header, :$color,
-          :$mouse, :$squash-spaces, :$table-expand, :$decimal-separator, :$prompt, :$undef, :$clear-screen;
+          :$mouse, :$squash-spaces, :$table-expand, :$decimal-separator, :$table-name, :$prompt, :$undef, :$clear-screen;
     self!_init_term();
     if ! @!orig_table.elems {
         $!tc.pause( ( 'Close with ENTER', ), :prompt( '"print-table": Empty table!' ) );
@@ -206,7 +199,8 @@ method !_recursive_code {
         # Choose
         my Int $row = $!tc.choose(
             $table,
-            :prompt( @header.join: "\n" ), :ll( $table_w ), :default( $old_row ), :1index, :2layout, :color( %!o<color> )
+            :prompt( @header.join: "\n" ), :ll( $table_w ), :default( $old_row ),
+            :1index, :2layout, :color( %!o<color> ), :footer( %!o<table-name> )
         );
         if ! $row.defined {
             return;
@@ -293,7 +287,7 @@ method !_print_single_table_row ( Int $row ) {
     my Str $separator = ' : ';
     my Int $sep_w = $separator.chars;
     my $col_w = $term_w - ( $key_w + $sep_w + 1 ); #
-    my @lines = ' Close with ENTER';
+    my @lines = ' Close with ENTER', ' ';
     for @!chosen_cols_idx -> $col {
         my $col_name = ( @!orig_table[0][$col] // %!o<undef> );
         if $col_name ~~ Buf {
@@ -602,8 +596,8 @@ method !_choose_columns {
         my Str $prompt = $init_prompt ~ ( @chosen_idxs.list ?? @cols[@chosen_idxs] !! '*' ).join: ', ';
         my @choices = |@pre, |@cols;
         # Choose
-        my Int @idx = $!tc.choose-multi( @choices, :prompt( $prompt ), :1index, :lf( 0, $init_prompt.chars ),
-                                                   :meta-items( |^@pre ), :undef( '<<' ), :2include-highlighted );
+        my Int @idx = |$!tc.choose-multi( @choices, :prompt( $prompt ), :1index, :lf( 0, $init_prompt.chars ),
+                                                    :meta-items( |^@pre ), :undef( '<<' ), :2include-highlighted );
         if ! @idx[0] {
             if @chosen_idxs.elems {
                 @chosen_idxs = [];
@@ -979,10 +973,6 @@ Default: 30
 Set the I<mouse> mode (see option C<mouse> in L<Term::Choose|https://github.com/kuerbis/Term-Choose-p6>).
 
 Default: 0
-
-=head2 save-screen DEPRECATED
-
-Deprecated. To use the alternate screen set I<clear-screen> to C<2>.
 
 =head2 progress-bar
 

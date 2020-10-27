@@ -242,11 +242,6 @@ Set the *mouse* mode (see option `mouse` in [Term::Choose](https://github.com/ku
 
 Default: 0
 
-save-screen DEPRECATED
-----------------------
-
-Deprecated. To use the alternate screen set *clear-screen* to `2`.
-
 progress-bar
 ------------
 
