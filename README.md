@@ -27,7 +27,7 @@ SYNOPSIS
 
         my $pt = Term::TablePrint.new();
 
-        $pt.print-table( @table, :mouse(1), :choose-columns(1) );
+        $pt.print-table( @table, :mouse(1) );
 
 DESCRIPTION
 ===========
@@ -82,8 +82,6 @@ If the cursor is not on the first row:
 
 If the width of the window is changed and the option *table-expand* is enabled, the user can rewrite the screen by choosing a row.
 
-If the option *choose-columns* is enabled, the `SpaceBar` key (or the right mouse key) can be used to select columns - see option [/choose-columns](/choose-columns).
-
 CONSTRUCTOR
 ===========
 
@@ -113,22 +111,8 @@ prompt
 
 String displayed above the table.
 
-choose-columns
---------------
-
-If *choose-columns* is set to `1`, the user can choose which columns to print. Columns can be added (with the `SpaceBar` and the `Return` key) until the user confirms with the *-ok-* menu entry.
-
-Default: 0
-
-### clear-screen
-
-0 - off
-
-1 - clears the screen before printing the table (default)
-
-2 - use the alternate screen
-
-### color
+color
+-----
 
 If this option is enabled, SRG ANSI escape sequences can be used to color the screen output.
 
@@ -249,6 +233,13 @@ Set the progress bar threshold. If the number of fields (rows x columns) is high
 
 Default: 5_000
 
+save-screen
+-----------
+
+0 - off (default)
+
+1 - use the alternate screen
+
 squash-spaces
 -------------
 
@@ -266,7 +257,11 @@ Default: 2
 table-expand
 ------------
 
-If the option *table-expand* is set to `1` or `2` and `Return` is pressed, the selected table row is printed with each column in its own line. Exception: if *table-expand* is set to `1` and the cursor auto-jumped to the first row, the first row will not be expanded.
+If the option *table-expand* is enabled and `Return` is pressed, the selected table row is printed with each column in its own line. Exception: if the cursor auto-jumped to the first row, the first row will not be expanded.
+
+0 - off
+
+1 - on (default)
 
         .----------------------------.        .----------------------------.
         |col1 | col2   | col3 | col3 |        |                            |

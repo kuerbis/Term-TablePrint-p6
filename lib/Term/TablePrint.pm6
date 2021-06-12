@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.5.2>;
+unit class Term::TablePrint:ver<1.5.3>;
 
 use Term::Choose;
 use Term::Choose::LineFold;
@@ -15,13 +15,15 @@ has UInt       $.max-rows          = 50_000;
 has UInt       $.min-col-width     = 30;
 has UInt       $.progress-bar      = 5_000;
 has UInt       $.tab-width         = 2;
-has Int_0_or_1 $.choose-columns    = 0;
+has Int_0_or_1 $.choose-columns;                # 12.06.2021 - remove
 has Int_0_or_1 $.keep-header       = 1;
 has Int_0_or_1 $.loop              = 0; # private
 has Int_0_or_1 $.mouse             = 0;
+has Int_0_or_1 $.save-screen       = 0;
 has Int_0_or_1 $.squash-spaces     = 0;
-has Int_0_to_2 $.clear-screen      = 1;
+has Int_0_to_2 $.clear-screen;                  # 12.06.2021 - remove
 has Int_0_to_2 $.color             = 0;
+has Int_0_to_2 $.f3                = 1;
 has Int_0_to_2 $.grid              = 1;
 has Int_0_to_2 $.table-expand      = 1;
 has Str        $.decimal-separator = '.';
@@ -29,16 +31,20 @@ has Str        $.table-name        = '';
 has Str        $.prompt            = '';
 has Str        $.undef             = '';
 
-has     @!orig_table;
+has     @!tbl_orig;
+has     @!tbl_copy;
 has Int @!w_heads;
 has     @!w_cols;
 has     @!w_int;
 has     @!w_fract;
-has Int @!avail_w_cols;
-has Int @!rows_idx;
-has Int @!chosen_cols_idx;
+has Int @!w_cols_calc;
 has     @!portions;
 
+has $!filter = '';
+has @!map_indexes;
+has %!map_return_wr_table = :0last, :1window_width_changed, :2enter_search_string, :3returned_from_filtered_table;
+
+has Int  $!row_count;
 has Int  $!tab_w;
 has Str  $!info_row;
 has Str  $!thsd_sep = ',';
@@ -51,15 +57,15 @@ method !_init_term {
     if ! $!loop {
         print hide-cursor;
     }
-    if %!o<clear-screen> == 2 {
+    if %!o<save-screen> {
         print save-screen;
     }
-    $!tc = Term::Choose.new( :mouse( %!o<mouse> ), :0hide-cursor );
+    $!tc = Term::Choose.new( :mouse( %!o<mouse> ), :0hide-cursor, :1clear-screen ); # c-s 
 }
 
 
 method !_end_term {
-    if %!o<clear-screen> == 2 {
+    if %!o<save-screen> {
         print restore-screen;
     }
     if ! $!loop {
@@ -74,17 +80,19 @@ sub print-table ( @orig_table, *%opt ) is export( :DEFAULT, :print-table ) {
 
 
 method print-table (
-        @!orig_table,
+        @!tbl_orig,
         UInt       :$max-rows          = $!max-rows,
         UInt       :$min-col-width     = $!min-col-width,
         UInt       :$progress-bar      = $!progress-bar,
         UInt       :$tab-width         = $!tab-width,
-        Int_0_or_1 :$choose-columns    = $!choose-columns,
+        Int_0_or_1 :$choose-columns    = $!choose-columns,  # 12.06.2021 - remove
         Int_0_or_1 :$keep-header       = $!keep-header,
         Int_0_or_1 :$mouse             = $!mouse,
+        Int_0_or_1 :$save-screen       = $!save-screen,
         Int_0_or_1 :$squash-spaces     = $!squash-spaces,
-        Int_0_to_2 :$clear-screen      = $!clear-screen,
+        Int_0_to_2 :$clear-screen      = $!clear-screen,    # 12.06.2021 - remove
         Int_0_to_2 :$color             = $!color,
+        Int_0_to_2 :$f3                = $!f3,
         Int_0_to_2 :$grid              = $!grid,
         Int_0_to_2 :$table-expand      = $!table-expand,
         Str        :$decimal-separator = $!decimal-separator,
@@ -92,10 +100,20 @@ method print-table (
         Str        :$prompt            = $!prompt,
         Str        :$undef             = $!undef,
     ) {
-    %!o = :$max-rows, :$min-col-width, :$progress-bar, :$tab-width, :$choose-columns, :$grid, :$keep-header, :$color,
-          :$mouse, :$squash-spaces, :$table-expand, :$decimal-separator, :$table-name, :$prompt, :$undef, :$clear-screen;
+    %!o = :$max-rows, :$min-col-width, :$progress-bar, :$tab-width, :$keep-header, :$mouse, :$save-screen,
+          :$squash-spaces, :$color, :$f3, :$grid, :$table-expand, :$decimal-separator, :$table-name, :$prompt, :$undef;
     self!_init_term();
-    if ! @!orig_table.elems {
+
+    #######################################################################################################
+    if $clear-screen.defined {          # 12.06.2021 - remove
+        $!tc.pause( ( 'Continue with ENTER', ), :prompt( 'The option `clear-screen` has been removed. See option `save-screen`' ) );
+    }
+    if $choose-columns.defined {        # 12.06.2021 - remove
+        $!tc.pause( ( 'Continue with ENTER', ), :prompt( 'The option `choose-columns` has been removed.' ) );
+    }
+    #######################################################################################################
+
+    if ! @!tbl_orig.elems {
         $!tc.pause( ( 'Close with ENTER', ), :prompt( '"print-table": Empty table!' ) );
         self!_end_term;
         return;
@@ -110,122 +128,168 @@ method print-table (
     if %!o<grid> && %!o<tab-width> %% 2 {
         $!tab_w++;
     }
-    my Int $table_row_count = @!orig_table.elems - 1; # first row is header row
-    if %!o<max-rows> && $table_row_count >= %!o<max-rows> {
-        $!info_row = sprintf( 'Reached the row LIMIT %s', insert-sep( %!o<max-rows>, $!thsd_sep ) );
-        if $table_row_count > %!o<max-rows> {
-            $!info_row ~= sprintf( '  (total %s)', insert-sep( $table_row_count, $!thsd_sep ) );
-        }
-        @!rows_idx = 0 .. %!o<max-rows>; # -1 for index and +1 for header row
-    }
-    else {
-        @!rows_idx = 0 .. @!orig_table.end;
-    }
-    if %!o<choose-columns> {
-        @!chosen_cols_idx = self!_choose_columns();
-        if ! @!chosen_cols_idx[0].defined {
-            self!_end_term();
-            return;
-        }
-    }
-    else {
-       @!chosen_cols_idx = ^@!orig_table[0];
-    }
-    self!_init_progress_bar();
+    self!_row_count( @!tbl_orig.elems );
+    self!_init_progress_bar( 3 );
     self!_split_work_for_threads();
-    self!_recursive_code();
+    self!_copy_table();
+    self!_calc_col_width();
+    my ( Int $term_w, Int $table_w, Array $tbl_print, Array $header );
+
+    loop {
+        my $next = self!_write_table( $term_w, $table_w, $tbl_print, $header );
+        if $next == %!map_return_wr_table<last> {
+            last;
+        }
+        elsif $next == %!map_return_wr_table<window_width_changed> {
+        }
+        elsif $next == %!map_return_wr_table<enter_search_string> {
+            self!_search();
+        }
+        elsif $next == %!map_return_wr_table<returned_from_filtered_table> {
+            self!_reset_search();
+        }
+        next;
+    }
     self!_end_term();
     return;
 }
 
 
-method !_recursive_code {
-    my $table = []; #
-    self!_copy_table( $table );
-    self!_calc_col_width( $table );
-    my $term_w = get-term-size().[0] + 1; # + 1 if not win32
-    my $ok = self!_calc_avail_col_width( $term_w, $table );
-    if ! $ok {
-        return; #
-    }
-    my Int $table_w = [+] |@!avail_w_cols, $!tab_w * @!avail_w_cols.end;
-    if ! $table_w {
-        return;
-    }
-    self!_table_row_to_string( $table );
-    my Str @header;
-    if %!o<prompt> {
-        @header.push: %!o<prompt>;
-    }
-    if %!o<keep-header> {
-        @header.push: self!_header_separator if %!o<grid> == 2;
-        @header.push: $table.shift;
-        @header.push: self!_header_separator if %!o<grid>;
-    }
-    else {
-        $table.splice( 1, 0, self!_header_separator ) if %!o<grid>;
-        $table.unshift: self!_header_separator        if %!o<grid> == 2;
-    }
-    if $!info_row {
-        if print-columns( $!info_row ) > $table_w {
-            $table.push: to-printwidth( $!info_row, $table_w - 3 ).[0] ~ '...';
+method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header is rw ) {
+    if ! $term_w || $term_w != get-term-size().[0] + 1 { # + 1 if not win32
+        $term_w = get-term-size().[0] + 1;
+        self!_init_progress_bar( 1 );
+        my $ok = self!_calc_avail_col_width( $term_w );
+        if ! $ok {
+            return %!map_return_wr_table<last>;
+        }
+        $table_w = [+] |@!w_cols_calc, $!tab_w * @!w_cols_calc.end;
+        if ! $table_w {
+            return %!map_return_wr_table<last>;
+        }
+        $tbl_print = self!_table_row_to_string();
+        $header = [];
+        if %!o<prompt>.chars {
+            $header.push: %!o<prompt>;
+        }
+        my $col_names = $tbl_print.shift;
+        my $header_sep = self!_header_separator();
+        if %!o<keep-header> {
+            if %!o<grid> == 1 {
+                $header.push:              $col_names, $header_sep;
+            }
+            elsif %!o<grid> == 2 {
+                $header.push: $header_sep, $col_names, $header_sep;
+            }
+            else {
+                $header.push:              $col_names;
+            }
         }
         else {
-            $table.push: $!info_row ~ ' ' x ( $table_w - $!info_row.chars ); #
+            if %!o<grid> == 1 {
+                $tbl_print.unshift:              $col_names, $header_sep;
+            }
+            elsif %!o<grid> == 2 {
+                $tbl_print.unshift: $header_sep, $col_names, $header_sep;
+            }
+            else {
+                $tbl_print.unshift:              $col_names;
+            }
+        }
+        if $!info_row {
+            if print-columns( $!info_row ) > $table_w {
+                $tbl_print.push: to-printwidth( $!info_row, $table_w - 3 ).[0] ~ '...';
+            }
+            else {
+                $tbl_print.push: $!info_row ~ ' ' x ( $table_w - $!info_row.chars ); #
+            }
+        }
+        self!_reset_search(); # map_indexes has unshifted 0.
+    }
+    my $return = %!map_return_wr_table<last>;
+    my @idxs_tbl_print;
+    if $!filter.chars {
+        if %!o<keep-header> {
+            @idxs_tbl_print = @!map_indexes.map: { $_ - 1 };
+        }
+        else {
+            if %!o<grid> {
+                @idxs_tbl_print = @!map_indexes.map: { $_ + %!o<grid> };
+                if %!o<grid> == 1 {
+                    @idxs_tbl_print.unshift: 0, 1;
+                }
+                elsif %!o<grid> == 2 {
+                    @idxs_tbl_print.unshift: 0, 1, 2;
+                }
+            }
+        }
+        @!map_indexes.unshift: 0;
+        $return = %!map_return_wr_table<returned_from_filtered_table>;
+    }
+    my $footer;
+    if %!o<table-name> {
+        $footer = '- ' ~ %!o<table-name>;
+        if $!filter.chars {
+            $footer ~= '  ' ~ ( %!o<f3> == 1 ?? 'rx:i/' !! 'rx/' ) ~ $!filter ~ '/';
         }
     }
     my Int $old_row = 0;
     my Int $auto_jumped_to_row_0 = 2;
     my Int $row_is_expanded = 0;
-    if %!o<clear-screen> {
-        print clear;
-    }
-    else {
-        print clr-lines-to-bot;
-    }
 
     loop {
         if $term_w != get-term-size().[0] + 1 {
-            $term_w = get-term-size().[0] + 1;
-            self!_recursive_code();
-            return;
+            return %!map_return_wr_table<window_width_changed>;
         }
-        if ( %!o<keep-header> && ! $table.elems ) || ( ! %!o<keep-header> && $table.elems == 1 ) {
+        if ( $!row_count <= 1 ) {
             # Choose
-            $!tc.pause( ( $table[0], ), :prompt( 'EMPTY!' ), :0layout, :undef( '<<' ) );
-            return;
+            my $tmp := %!o<keep-header> ?? $header !! $tbl_print;
+            $!tc.pause( ( 'Empty table!', ), :prompt( $tmp.join: "\n" ), :0layout );
+            return %!map_return_wr_table<last>;
         }
         %*ENV<TC_RESET_AUTO_UP> = 0;
         # Choose
         my Int $row = $!tc.choose(
-            $table,
-            :prompt( @header.join: "\n" ), :ll( $table_w ), :default( $old_row ),
-            :1index, :2layout, :color( %!o<color> ), :footer( %!o<table-name> )
+            @idxs_tbl_print.elems ?? $tbl_print[@idxs_tbl_print] !! $tbl_print,
+            :prompt( $header.join: "\n" ), :ll( $table_w ), :default( $old_row ),
+            :1index, :2layout, :color( %!o<color> ), :$footer
         );
         if ! $row.defined {
-            return;
+            return $return;
         }
         if $row < 0 {
-            print clear;
-            self!_init_progress_bar();
-            next;   # choose: ll + changed window size: returns -1;
+            if $row == -1 {         # with option `ll` set and changed window width `choose` returns -1;
+                return %!map_return_wr_table<window_width_changed>;
+            }
+            elsif $row == -13 {     # `choose` returns -13 if `F3` was pressed
+                if $!filter.chars {
+                    self!_reset_search();
+                }
+                return %!map_return_wr_table<enter_search_string>;
+            }
+            else {
+                return %!map_return_wr_table<last>;
+            }
         }
         if ! %!o<table-expand> {
-            return if $row == 0;
+            if $row == 0 {
+                return $return;
+            }
             next;
         }
         else {
             if $old_row == $row {
                 if $row == 0 {
                     if ! %!o<keep-header> {
-                        return;
+                        return $return;
                     }
-                    elsif %!o<table-expand> == 1 {
-                        return if $row_is_expanded;
-                        return if $auto_jumped_to_row_0 == 1;
-                    }
-                    elsif %!o<table-expand> == 2 {
-                        return if $row_is_expanded;
+                    elsif %!o<table-expand> {
+                        if $row_is_expanded {
+                            return $return;
+                        }
+                        if $auto_jumped_to_row_0 == 1 {
+                            return $return;
+                        }
                     }
                     $auto_jumped_to_row_0 = 0;
                 }
@@ -241,7 +305,7 @@ method !_recursive_code {
             }
             $old_row = $row;
             $row_is_expanded = 1;
-            if $!info_row && $row == $table.end {
+            if $!info_row && $row == $tbl_print.end {
                 $!tc.pause( ( 'Close', ), :prompt( $!info_row ) );
                 next;
             }
@@ -271,14 +335,21 @@ method !_recursive_code {
                     }
                 }
             }
-            self!_print_single_table_row( $row );
+            my $orig_row;
+            if @!map_indexes.elems {
+                $orig_row = @!map_indexes[$row];
+            }
+            else {
+                $orig_row = $row;
+            }
+            self!_print_single_table_row( $orig_row, $footer );
         }
         %*ENV<TC_RESET_AUTO_UP>:delete;
     }
 }
 
 
-method !_print_single_table_row ( Int $row ) {
+method !_print_single_table_row ( Int $row, Str $footer ) {
     my Int $term_w = get-term-size().[0] + 1;
     my Int $key_w = @!w_heads.max + 1; #
     if $key_w > $term_w div 100 * 33 {
@@ -288,41 +359,42 @@ method !_print_single_table_row ( Int $row ) {
     my Int $sep_w = $separator.chars;
     my $col_w = $term_w - ( $key_w + $sep_w + 1 ); #
     my @lines = ' Close with ENTER', ' ';
-    for @!chosen_cols_idx -> $col {
-        my $col_name = ( @!orig_table[0][$col] // %!o<undef> );
+    for ^@!tbl_orig[0] -> $col {
+        my $col_name = ( @!tbl_orig[0][$col] // %!o<undef> );
         if $col_name ~~ Buf {
             $col_name = $col_name.gist;
         }
         if %!o<color> { # elsif
-            $col_name.=subst( / \e \[ <[\d;]>* m /, '', :g ); # msg
+            $col_name.=subst( / \e \[ <[\d;]>* m /, '', :g );
         }
         $col_name.=subst( / \t /,  ' ', :g );
         $col_name.=subst( / \v+ /,  '  ', :g );
         $col_name.=subst( / <:Cc+:Noncharacter_Code_Point+:Cs> /, '', :g );
         my Str $key = to-printwidth( $col_name, $key_w, False ).[0];
-        my $cell = @!orig_table[$row][$col];
+        my $cell = @!tbl_orig[$row][$col];
         if %!o<color> {
-            $cell.=subst( / \e \[ <[\d;]>* m /, '', :g ); # msg
+            $cell.=subst( / \e \[ <[\d;]>* m /, '', :g );
         }
         my Str $sep = $separator;
-        @lines.push: ' ';
         for line-fold( $cell, $col_w ) -> $line { # color ?
             @lines.push: sprintf "%*.*s%*s%s", $key_w xx 2, $key, $sep_w, $sep, $line;
             $key = '' if $key;
             $sep = '' if $sep;
         }
+        @lines.push: ' ';
     }
-    $!tc.pause( @lines, :prompt( '' ), :2layout );
+    @lines.pop;
+    $!tc.pause( @lines, :prompt( '' ), :2layout, :$footer );
 }
 
 
-method !_copy_table ( $table ) {
+method !_copy_table {
     my ( Int $count, Int $step ) = self!_set_progress_bar;       #
     my @promise;
     my $lock = Lock.new();
     for @!portions -> $range {
         @promise.push: start {
-            do for $range[0] ..^ $range[1] -> $row {
+            do for |$range -> $row {
                 if $step {                                       #
                     $lock.protect( {                             #
                         ++$count;                                #
@@ -331,8 +403,8 @@ method !_copy_table ( $table ) {
                         }                                        #
                     } );                                         #
                 }
-                do for @!chosen_cols_idx -> $col {
-                    my $str = ( @!orig_table.AT-POS($row).AT-POS($col) // %!o<undef> );  # this is where the copying happens
+                do for ^@!tbl_orig[0] -> $col {
+                    my $str = ( @!tbl_orig.AT-POS($row).AT-POS($col) // %!o<undef> );  # this is where the copying happens
                     if $str ~~ Buf {
                         $str = $str.gist;
                     }
@@ -353,36 +425,38 @@ method !_copy_table ( $table ) {
             }
         };
     }
+    @!tbl_copy= [];
     for await @promise -> @portion {
         for @portion -> @p_rows {
-            $table.push: @p_rows;
+            @!tbl_copy.push: @p_rows;
         }
     }
     if $step {                                                   #
         self!_last_update_progress_bar( $count );                #
     }                                                            #
+    return;
 }
 
 
-method !_calc_col_width ( $table ) {
+method !_calc_col_width {
     my ( Int $count, Int $step ) = self!_set_progress_bar;       #
-    my Int @col_idx = 0 .. $table[0].end; # new indexes
+    my Int @idx_cols = 0 .. @!tbl_copy[0].end; # new indexes
     @!w_heads = ();
-    for @col_idx -> $col {
-       @!w_heads.BIND-POS( $col, print-columns( $table.AT-POS(0).AT-POS($col) ) );
+    for @idx_cols -> $col {
+       @!w_heads.BIND-POS( $col, print-columns( @!tbl_copy.AT-POS(0).AT-POS($col) ) );
     }
-    my $size = $table[0].elems;
+    my $size = @!tbl_copy[0].elems;
     my @w_cols[$size]  = ( 1 xx $size );
     my @w_int[$size]   = ( 0 xx $size );
     my @w_fract[$size] = ( 0 xx $size );
-    @!portions[0][0] = 1; # 0 already done: w_heads
+    my $header_idx = @!portions[0].shift; # already done: w_heads 
     my $ds = %!o<decimal-separator>;
     my @promise;
     my $lock = Lock.new();
     for @!portions -> $range {
         my @cache;
         @promise.push: start {
-            for $range[0] ..^ $range[1] -> $row {
+            for |$range -> $row {
                 if $step {                                       #
                     $lock.protect( {                             #
                         ++$count;                                #
@@ -391,11 +465,11 @@ method !_calc_col_width ( $table ) {
                         }                                        #
                     } );                                         #
                 }                                                #
-                for @col_idx -> $col {
-                    if $table.AT-POS($row).AT-POS($col).chars {
-                        if $table.AT-POS($row).AT-POS($col) ~~ / ^ ( <[-+]>? <[0..9]>* ) ( $ds <[0..9]>+ )? $ / {
-                            if $table.AT-POS($row).AT-POS($col).chars > @w_cols.AT-POS($col) {
-                                @w_cols.BIND-POS( $col, $table.AT-POS($row).AT-POS($col).chars );
+                for @idx_cols -> $col {
+                    if @!tbl_copy.AT-POS($row).AT-POS($col).chars {
+                        if @!tbl_copy.AT-POS($row).AT-POS($col) ~~ / ^ ( <[-+]>? <[0..9]>* ) ( $ds <[0..9]>+ )? $ / {
+                            if @!tbl_copy.AT-POS($row).AT-POS($col).chars > @w_cols.AT-POS($col) {
+                                @w_cols.BIND-POS( $col, @!tbl_copy.AT-POS($row).AT-POS($col).chars );
                             }
                             if $0.defined && $0.chars > @w_int.AT-POS($col) {
                                 @w_int.BIND-POS( $col, $0.chars );
@@ -405,7 +479,7 @@ method !_calc_col_width ( $table ) {
                             }
                         }
                         else {
-                            my $width = print-columns( $table.AT-POS($row).AT-POS($col), @cache );
+                            my $width = print-columns( @!tbl_copy.AT-POS($row).AT-POS($col), @cache );
                             if $width > @w_cols.AT-POS($col) {
                                 @w_cols.BIND-POS( $col, $width );
                             }
@@ -416,7 +490,7 @@ method !_calc_col_width ( $table ) {
         };
     }
     await @promise;
-    @!portions[0][0] = 0; # reset
+    @!portions[0].unshift: $header_idx;
     @!w_cols  := @w_cols;
     @!w_int   := @w_int;
     @!w_fract := @w_fract;
@@ -426,16 +500,16 @@ method !_calc_col_width ( $table ) {
 }
 
 
-method !_calc_avail_col_width( $term_w, $table ) {
-    @!avail_w_cols = @!w_cols;
-    my Int $avail_w = $term_w - $!tab_w * @!avail_w_cols.end;
-    my Int $sum = [+] @!avail_w_cols;
+method !_calc_avail_col_width( $term_w ) {
+    @!w_cols_calc = @!w_cols;
+    my Int $avail_w = $term_w - $!tab_w * @!w_cols_calc.end;
+    my Int $sum = [+] @!w_cols_calc;
     if $sum < $avail_w {
         HEAD: loop {
             my Int $count = 0;
             for ^@!w_heads -> $i {
-                if @!w_heads.AT-POS($i) > @!avail_w_cols.AT-POS($i) {
-                    ++@!avail_w_cols.AT-POS($i);
+                if @!w_heads.AT-POS($i) > @!w_cols_calc.AT-POS($i) {
+                    ++@!w_cols_calc.AT-POS($i);
                     ++$count;
                     last HEAD if ( $sum + $count ) == $avail_w;
                 }
@@ -447,28 +521,28 @@ method !_calc_avail_col_width( $term_w, $table ) {
     elsif $sum > $avail_w {
         my Int $mininum_w = %!o<min-col-width> || 1;
         if @!w_heads.elems > $avail_w {
-            self!_print_term_not_wide_enough_message( $table );
+            self!_print_term_not_wide_enough_message();
             return;
         }
-        my Int @tmp_cols_w = @!avail_w_cols;
+        my Int @w_cols_tmp = @!w_cols_calc;
         my Int $percent = 0;
 
         MIN: while $sum > $avail_w {
             ++$percent;
             my Int $count = 0;
-            for ^@tmp_cols_w -> $i {
-                if $mininum_w >= @tmp_cols_w.AT-POS($i) {
+            for ^@w_cols_tmp -> $i {
+                if $mininum_w >= @w_cols_tmp.AT-POS($i) {
                     next;
                 }
-                if $mininum_w >= _minus_x_percent( @tmp_cols_w.AT-POS($i), $percent ) {
-                    @tmp_cols_w[$i] = $mininum_w;
+                if $mininum_w >= _minus_x_percent( @w_cols_tmp.AT-POS($i), $percent ) {
+                    @w_cols_tmp[$i] = $mininum_w;
                 }
                 else {
-                    @tmp_cols_w[$i] = _minus_x_percent( @tmp_cols_w[$i], $percent );
+                    @w_cols_tmp[$i] = _minus_x_percent( @w_cols_tmp[$i], $percent );
                 }
                 ++$count;
             }
-            $sum = @tmp_cols_w.sum;
+            $sum = @w_cols_tmp.sum;
             $mininum_w-- if $count == 0;
             #last MIN if $mininum_w == 0;
         }
@@ -477,9 +551,9 @@ method !_calc_avail_col_width( $term_w, $table ) {
 
             REST: loop {
                 my $count = 0;
-                for ^@tmp_cols_w -> $i {
-                    if @tmp_cols_w.AT-POS($i) < @!avail_w_cols.AT-POS($i) {
-                        @tmp_cols_w.BIND-POS( $i, @tmp_cols_w.AT-POS($i) + 1 );
+                for ^@w_cols_tmp -> $i {
+                    if @w_cols_tmp.AT-POS($i) < @!w_cols_calc.AT-POS($i) {
+                        @w_cols_tmp.BIND-POS( $i, @w_cols_tmp.AT-POS($i) + 1 );
                         $rest--;
                         $count++;
                         last REST if $rest == 0;
@@ -488,14 +562,14 @@ method !_calc_avail_col_width( $term_w, $table ) {
                 last REST if $count == 0;
             }
         }
-        @!avail_w_cols = [ @tmp_cols_w ] if @tmp_cols_w.elems;
+        @!w_cols_calc = [ @w_cols_tmp ] if @w_cols_tmp.elems;
     }
     return 1;
 }
 
 
-method !_table_row_to_string( $table ) {
-    my Int @col_idx = 0 .. $table[0].end;
+method !_table_row_to_string {
+    my Int @idx_cols = 0 .. @!tbl_copy[0].end;
     my Str $tab;
     if %!o<grid> {
         $tab = ( ' ' x $!tab_w div 2 ) ~ '|' ~ ( ' ' x $!tab_w div 2 );
@@ -510,13 +584,13 @@ method !_table_row_to_string( $table ) {
     for @!portions -> $range {
         my @cache;
         @promise.push: start {
-            do for $range[0] ..^ $range[1] -> $row {
+            do for |$range -> $row {
                 my Str $str = '';
-                for @col_idx -> $col {
-                    if ! $table.AT-POS($row).AT-POS($col).chars {
-                            $str = $str ~ ' ' x @!avail_w_cols.AT-POS($col);
+                for @idx_cols -> $col {
+                    if ! @!tbl_copy.AT-POS($row).AT-POS($col).chars {
+                            $str = $str ~ ' ' x @!w_cols_calc.AT-POS($col);
                     }
-                    elsif $table.AT-POS($row).AT-POS($col) ~~ / ^ ( <[-+]>? <[0..9]>* ) ( $ds <[0..9]>+ )? $ / {
+                    elsif @!tbl_copy.AT-POS($row).AT-POS($col) ~~ / ^ ( <[-+]>? <[0..9]>* ) ( $ds <[0..9]>+ )? $ / {
                         my Str $all = '';
                         if @!w_fract.AT-POS($col) {
                             if $1.defined {
@@ -539,18 +613,18 @@ method !_table_row_to_string( $table ) {
                                 $all = $0 ~ $all;
                             }
                         }
-                        if $all.chars > @!avail_w_cols.AT-POS($col) {
-                            $str = $str ~ $all.substr( 0, @!avail_w_cols.AT-POS($col) );
+                        if $all.chars > @!w_cols_calc.AT-POS($col) {
+                            $str = $str ~ $all.substr( 0, @!w_cols_calc.AT-POS($col) );
                         }
                         else {
-                            $str = $str ~ ' ' x ( @!avail_w_cols.AT-POS($col) - $all.chars ) ~ $all;
+                            $str = $str ~ ' ' x ( @!w_cols_calc.AT-POS($col) - $all.chars ) ~ $all;
                         }
                     }
                     else {
-                        $str = $str ~ unicode-sprintf( $table.AT-POS($row).AT-POS($col), @!avail_w_cols.AT-POS($col), @cache );
+                        $str = $str ~ unicode-sprintf( @!tbl_copy.AT-POS($row).AT-POS($col), @!w_cols_calc.AT-POS($col), @cache );
                     }
-                    if %!o<color> && @!orig_table.AT-POS($row).AT-POS($col).defined { #
-                        my @color = @!orig_table.AT-POS($row).AT-POS($col).comb( / \e \[ <[\d;]>* m / );
+                    if %!o<color> && @!tbl_orig.AT-POS($row).AT-POS($col).defined { #
+                        my @color = @!tbl_orig.AT-POS($row).AT-POS($col).comb( / \e \[ <[\d;]>* m / );
                         if @color.elems {
                             $str.=subst( / \x[feff] /, { @color.shift }, :g );
                             if @color.elems {
@@ -558,7 +632,7 @@ method !_table_row_to_string( $table ) {
                             }
                         }
                     }
-                    if $col != @!avail_w_cols.end {
+                    if $col != @!w_cols_calc.end {
                         $str = $str ~ $tab;
                     }
                 }
@@ -574,88 +648,135 @@ method !_table_row_to_string( $table ) {
             }
         };
     }
+    my $tbl_print = [];
     for await @promise -> @portion {
         for @portion {
-            $table.BIND-POS( .[0], .[1] ); # overwrites $table
+            $tbl_print.BIND-POS( .[0], .[1] );
         }
     }
     if $step {                                                   #
         self!_last_update_progress_bar( $count );                #
     }                                                            #
+    return $tbl_print;
 }
 
 
-method !_choose_columns {
-    my Str $init_prompt = 'Columns: ';
-    my Str $ok = '-ok-';
-    my Str @pre = ( Str, $ok );
-    my Int @chosen_idxs;
-    my @cols = @!orig_table[0].map( { $_ // %!o<undef> } );
+method !_search {
+    if ! %!o<f3> {
+        return;
+    }
+    print "\r", clr-lines-to-bot;
+    print show-cursor;
+    my $prompt = 'Search pattern: ';
+    my ( $string, $regex );
 
-    loop {
-        my Str $prompt = $init_prompt ~ ( @chosen_idxs.list ?? @cols[@chosen_idxs] !! '*' ).join: ', ';
-        my @choices = |@pre, |@cols;
-        # Choose
-        my Int @idx = |$!tc.choose-multi( @choices, :prompt( $prompt ), :1index, :lf( 0, $init_prompt.chars ),
-                                                    :meta-items( |^@pre ), :undef( '<<' ), :2include-highlighted );
-        if ! @idx[0] {
-            if @chosen_idxs.elems {
-                @chosen_idxs = [];
-                next;
-            }
+    READ: loop {
+        if ( try require Readline ) === Nil {
+            $string = prompt( $prompt );
+        }
+        else {
+            require Readline;
+            my $rl = ::('Readline').new;
+            $string = $rl.readline( $prompt );
+        }
+        if ! $string.chars {
             return;
         }
-        elsif @choices[@idx[0]].defined && @choices[@idx[0]] eq $ok {
-            @idx.shift;
-            @chosen_idxs.append: @idx >>->> @pre.elems;
-            return @chosen_idxs.elems ?? @chosen_idxs !! ^@!orig_table[0]; # p5
+        print up( 1 );
+        print "\r{$prompt}{$string}";
+        try {
+            $regex = %!o<f3> == 1 ?? rx:i/<$string>/ !! rx/<$string>/;
+            'Teststring' ~~ $regex;
         }
-        @chosen_idxs.append: @idx >>->> @pre.elems;
+        if $! {
+            $!tc.pause( ( 'Continue with ENTER', ), :prompt( $!.Str ), :0layout );
+            next READ;
+        }
+        last READ;
+    }
+    print hide-cursor;
+    @!map_indexes = [];
+    for 1 .. @!tbl_copy.end -> $idx {
+        if @!tbl_copy[$idx].any ~~ $regex {
+            @!map_indexes.push: $idx;
+        }
+    }
+    if ! @!map_indexes.elems {
+        $!tc.pause( ( 'Continue with ENTER', ), :prompt( 'No matches found.' ), :0layout );
+        return;
+    }
+    $!filter = $string;
+    return;
+}
+
+
+method !_reset_search {
+    @!map_indexes = [];
+    $!filter = '';
+}
+
+
+method !_row_count ( $orig_row_count ) {
+    if %!o<max-rows> && $orig_row_count >= %!o<max-rows> + 1 {
+        $!info_row = sprintf( 'ROW LIMIT %s (of %s)', insert-sep( %!o<max-rows>, $!thsd_sep ), insert-sep( $orig_row_count - 1, $!thsd_sep ) );
+        $!row_count = %!o<max-rows> + 1; # + 1 for header row
+    }
+    else {
+        $!info_row = '';
+        $!row_count = $orig_row_count;
     }
 }
+
 
 method !_split_work_for_threads {
     my Int $threads = num-threads();
-    while $threads * 2 > @!rows_idx.elems {
+    while $threads * 2 > $!row_count {
         last if $threads == 1;
         $threads = $threads div 2;
     }
-    my $size = @!rows_idx.elems div $threads;
-    @!portions = ( ^$threads ).map: { [ $size * $_, $size * ( $_ + 1 ) ] };
-    @!portions[@!portions.end][1] = @!rows_idx.elems;
+    my $size = $!row_count div $threads;
+    if ( $!row_count % $threads ) {
+        $size++;
+    }
+    my @idx_rows = 0 .. $!row_count - 1;
+    @!portions = ( ^$threads ).map: { [ @idx_rows.splice: 0, $size ] };
 }
 
-method !_init_progress_bar {
+
+method !_init_progress_bar ( $times ) {
     $!p_bar = {};
-    my Int $count_cells = @!rows_idx.elems * @!chosen_cols_idx.elems;
+    my Int $count_cells = $!row_count * @!tbl_orig[0].elems;
     if %!o<progress-bar> && %!o<progress-bar> < $count_cells {
+        print clear();
         print 'Computing: ';
-        $!p_bar<times> = 3;
+        $!p_bar<count_progress_bars> = $times;
         if $count_cells / %!o<progress-bar> > 50 {
-            $!p_bar<type> = 'multi';
-            $!p_bar<total> = @!rows_idx.elems;
+            $!p_bar<merge_progress_bars> = 0;
+            $!p_bar<total> = $!row_count;
         }
         else {
-            $!p_bar<type> = 'single';
-            $!p_bar<total> = @!rows_idx.elems * $!p_bar<times>;
+            $!p_bar<merge_progress_bars> = 1;
+            $!p_bar<total> = $!row_count * $!p_bar<count_progress_bars>;
         }
     }
 }
 
+
 method !_set_progress_bar {
-    if ! $!p_bar<type> {
+    if ! $!p_bar<count_progress_bars> {
         return Int, Int;
     }
     my Int $term_w = get-term-size().[0] + 1;
     my Int $count;
-    if $!p_bar<type> eq 'multi' {
-        $!p_bar<fmt> = 'Computing: (' ~ $!p_bar<times>-- ~ ') [%s%s]';
-        $count = 0;
-    }
-    else {
+    if $!p_bar<merge_progress_bars> {
         $!p_bar<fmt> = 'Computing: [%s%s]';
         $count = $!p_bar<so_far> // 0;
     }
+    else {
+        $!p_bar<fmt> = 'Computing: (' ~ $!p_bar<count_progress_bars> ~ ') [%s%s]';
+        $count = 0;
+    }
+    $!p_bar<count_progress_bars>--;
     if $term_w < 25 {
         $!p_bar<fmt> = '[%s%s]';
     }
@@ -664,38 +785,43 @@ method !_set_progress_bar {
     return $count, $step;
 }
 
+
 method !_update_progress_bar( Int $count ) { # sub
     my $multi = ( $count / ( $!p_bar{'total'} / $!p_bar<bar_w> ) ).ceiling;
     print "\r" ~ sprintf( $!p_bar<fmt>, '=' x $multi, ' ' x $!p_bar<bar_w> - $multi );
 }
 
+
 method !_last_update_progress_bar( $count ) {
-    if $!p_bar<times> < 1 ||  $!p_bar<type> eq 'multi' {
-        self!_update_progress_bar( $!p_bar<total> );
+    if $!p_bar<count_progress_bars> && $!p_bar<merge_progress_bars> {
+        $!p_bar<so_far> = $count;
     }
     else {
-        $!p_bar<so_far> = $count;
+        self!_update_progress_bar( $!p_bar<total> );
     }
     print "\r";
 }
 
+
 method !_header_separator { 
     my Str $header_sep = '';
     my Str $tab = ( '-' x $!tab_w div 2 ) ~ '|' ~ ( '-' x $!tab_w div 2 );
-    for ^@!avail_w_cols {
-        $header_sep ~= '-' x @!avail_w_cols[$_];
-        $header_sep ~= $tab if $_ != @!avail_w_cols.end;
+    for ^@!w_cols_calc {
+        $header_sep ~= '-' x @!w_cols_calc[$_];
+        $header_sep ~= $tab if $_ != @!w_cols_calc.end;
     }
     return $header_sep;
 }
 
-method !_print_term_not_wide_enough_message ( $table ) {
+
+method !_print_term_not_wide_enough_message {
     my $prompt1 = 'Terminal window is not wide enough to print this table.';
     $!tc.pause( [ 'Press ENTER to show the column names.' ], :prompt( $prompt1 ) );
     #my Str $prompt2 = 'Reduce the number of columns".' ~ "\n" ~ 'Close with ENTER.';
     my Str $prompt2 = 'Close with ENTER.';
-    $!tc.pause( $table[0], :prompt( $prompt2 ) );
+    $!tc.pause( @!tbl_copy[0], :prompt( $prompt2 ) );
 }
+
 
 sub _minus_x_percent ( Int $value, Int $percent ) {
     my Int $new = ( $value - ( $value / 100 * $percent ) ).Int;
@@ -737,7 +863,7 @@ Term::TablePrint - Print a table to the terminal and browse it interactively.
 
     my $pt = Term::TablePrint.new();
 
-    $pt.print-table( @table, :mouse(1), :choose-columns(1) );
+    $pt.print-table( @table, :mouse(1) );
 
 =end code
 
@@ -803,9 +929,6 @@ enabled.
 If the width of the window is changed and the option I<table-expand> is enabled, the user can rewrite the screen by
 choosing a row.
 
-If the option I<choose-columns> is enabled, the C<SpaceBar> key (or the right mouse key) can be used to select columns -
-see option L</choose-columns>.
-
 =head1 CONSTRUCTOR
 
 The constructor method C<new> can be called with named arguments. For the valid options see L<#OPTIONS>. Setting the
@@ -832,22 +955,7 @@ Defaults may change in future releases.
 
 String displayed above the table.
 
-=head2 choose-columns
-
-If I<choose-columns> is set to C<1>, the user can choose which columns to print. Columns can be added (with the
-C<SpaceBar> and the C<Return> key) until the user confirms with the I<-ok-> menu entry.
-
-Default: 0
-
-=head3 clear-screen
-
-0 - off
-
-1 - clears the screen before printing the table (default)
-
-2 - use the alternate screen
-
-=head3 color
+=head2 color
 
 If this option is enabled, SRG ANSI escape sequences can be used to color the screen output.
 
@@ -981,6 +1089,12 @@ shown while preparing the data for the output. Setting the value to C<0> disable
 
 Default: 5_000
 
+=head2 save-screen
+
+0 - off (default)
+
+1 - use the alternate screen
+
 =head2 squash-spaces
 
 If I<squash-spaces> is enabled, consecutive spaces are squashed to one space and leading and trailing spaces are removed.
@@ -996,9 +1110,12 @@ Default: 2
 
 =head2 table-expand
 
-If the option I<table-expand> is set to C<1> or C<2> and C<Return> is pressed, the selected table row is printed with
-each column in its own line. Exception: if I<table-expand> is set to C<1> and the cursor auto-jumped to the first row,
-the first row will not be expanded.
+If the option I<table-expand> is enabled and C<Return> is pressed, the selected table row is printed with each column in
+its own line. Exception: if the cursor auto-jumped to the first row, the first row will not be expanded.
+
+0 - off
+
+1 - on (default)
 
 =begin code
 
