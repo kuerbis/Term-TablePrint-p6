@@ -1,7 +1,11 @@
 Revision history for Term::TablePrint
 
 
+1.5.4  2021-06-13
+        - Removed options 'grid' and 'keep-header'.
+
 1.5.3  2021-06-12
+        - Loop instead of recursion.
         - New option 'f3' to filter table rows.
         - Reintroduced the option 'save-screen'.
         - Removed the option 'clear-screen'.

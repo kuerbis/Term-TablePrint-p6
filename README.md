@@ -68,17 +68,15 @@ Keys to move around:
 
   * the `Home` key (or `Ctrl-A`) to jump to the first row of the table, the `End` key (or `Ctrl-E`) to jump to the last row of the table.
 
-With *keep-header* set to `0` the `Return` key closes the table if the cursor is on the header row.
+If *table-expand* is set to `0`, the `Return` key closes the table if the cursor is on the first row.
 
-If *keep-header* is enabled (set to `1` or `2`) and *table-expand* is set to `0`, the `Return` key closes the table if the cursor is on the first row.
-
-If *keep-header* and *table-expand* are enabled and the cursor is on the first row, pressing `Return` three times in succession closes the table. If *table-expand* is set to `1` and the cursor is auto-jumped to the first row, it is required only one `Return` to close the table.
+If *table-expand* is enabled and the cursor is on the first row, pressing `Return` three times in succession closes the table. If *table-expand* is set to `1` and the cursor is auto-jumped to the first row, it is required only one `Return` to close the table.
 
 If the cursor is not on the first row:
 
   * with the option *table-expand* disabled the cursor jumps to the table head if `Return` is pressed.
 
-  * with the option *table-expand* enabled each column of the selected row is output in its own line preceded by the column name if `Return` is pressed. Another `Return` closes this output and goes back to the table output. If a row is selected twice in succession, the pointer jumps to the head of the table or to the first row if *keep-header* is enabled.
+  * with the option *table-expand* enabled each column of the selected row is output in its own line preceded by the column name if `Return` is pressed. Another `Return` closes this output and goes back to the table output. If a row is selected twice in succession, the pointer jumps to the first row.
 
 If the width of the window is changed and the option *table-expand* is enabled, the user can rewrite the screen by choosing a row.
 
@@ -130,76 +128,6 @@ If set, numbers use *decimal-separator* as the decimal separator instead of the 
 Allowed values: a character with a print width of `1`. If an invalid values is passed, *decimal-separator* falls back to the default value.
 
 Default: . (dot)
-
-keep-header
------------
-
-If *keep-header* is set to `0`, the table header is shown on top of the first page.
-
-        .----------------------------.    .----------------------------.    .----------------------------.
-        |col1   col2     col3   col3 |    |.....  .......  .....  .....|    |.....  .......  .....  .....|
-        |.....  .......  .....  .....|    |.....  .......  .....  .....|    |.....  .......  .....  .....|
-        |.....  .......  .....  .....|    |.....  .......  .....  .....|    |                            |
-        |.....  .......  .....  .....|    |.....  .......  .....  .....|    |                            |
-        |.....  .......  .....  .....|    |.....  .......  .....  .....|    |                            |
-        |.....  .......  .....  .....|    |.....  .......  .....  .....|    |                            |
-        |.....  .......  .....  .....|    |.....  .......  .....  .....|    |                            |
-        |.....  .......  .....  .....|    |.....  .......  .....  .....|    |                            |
-        | 1/3                        |    | 2/3                        |    | 3/3                        |
-        '----------------------------'    '----------------------------'    '----------------------------'
-
-If *keep-header* is set to `1`, the table header is shown on top of each page.
-
-        .----------------------------.    .----------------------------.    .----------------------------.
-        |col1   col2     col3   col3 |    |col1   col2     col3   col4 |    |col1   col2     col3   col4 |
-        |.....  .......  .....  .....|    |.....  .......  .....  .....|    |.....  .......  .....  .....|
-        |.....  .......  .....  .....|    |.....  .......  .....  .....|    |.....  .......  .....  .....|
-        |.....  .......  .....  .....|    |.....  .......  .....  .....|    |.....  .......  .....  .....|
-        |.....  .......  .....  .....|    |.....  .......  .....  .....|    |                            |
-        |.....  .......  .....  .....|    |.....  .......  .....  .....|    |                            |
-        |.....  .......  .....  .....|    |.....  .......  .....  .....|    |                            |
-        |.....  .......  .....  .....|    |.....  .......  .....  .....|    |                            |
-        | 1/3                        |    | 2/3                        |    | 3/3                        |
-        '----------------------------'    '----------------------------'    '----------------------------'
-
-Default: 1
-
-grid
-----
-
-If *grid* is set to `0`, the table is shown with no grid.
-
-        .----------------------------.
-        |col1  col2     col3   col3  |
-        |....  .......  .....  ..... |
-        |....  .......  .....  ..... |
-        |....  .......  .....  ..... |
-        |....  .......  .....  ..... |
-        |....  .......  .....  ..... |
-        |....  .......  .....  ..... |
-        |....  .......  .....  ..... |
-        |....  .......  .....  ..... |
-        |                            |
-        '----------------------------'
-
-If *grid* is set to `1`, lines separate the columns from each other and the header from the body.
-
-        .----------------------------.
-        |col1 | col2   | col3 | col3 |
-        |-----|--------|------|------|
-        |.... | ...... | .... | .... |
-        |.... | ...... | .... | .... |
-        |.... | ...... | .... | .... |
-        |.... | ...... | .... | .... |
-        |.... | ...... | .... | .... |
-        |.... | ...... | .... | .... |
-        |.... | ...... | .... | .... |
-        |.... | ...... | .... | .... |
-        '----------------------------'
-
-*grid* set to `2` is like *grid* set to `1` plus a separator line on top of the header row.
-
-Default: 1
 
 max-rows
 --------

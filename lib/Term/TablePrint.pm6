@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.5.3>;
+unit class Term::TablePrint:ver<1.5.4>;
 
 use Term::Choose;
 use Term::Choose::LineFold;
@@ -15,16 +15,16 @@ has UInt       $.max-rows          = 50_000;
 has UInt       $.min-col-width     = 30;
 has UInt       $.progress-bar      = 5_000;
 has UInt       $.tab-width         = 2;
-has Int_0_or_1 $.choose-columns;                # 12.06.2021 - remove
-has Int_0_or_1 $.keep-header       = 1;
+has Int_0_or_1 $.choose-columns;                # removed 12.06.2021
+has Int_0_or_1 $.keep-header;                   # removed 13.06.2021
 has Int_0_or_1 $.loop              = 0; # private
 has Int_0_or_1 $.mouse             = 0;
 has Int_0_or_1 $.save-screen       = 0;
 has Int_0_or_1 $.squash-spaces     = 0;
-has Int_0_to_2 $.clear-screen;                  # 12.06.2021 - remove
+has Int_0_to_2 $.clear-screen;                  # removed 12.06.2021
 has Int_0_to_2 $.color             = 0;
 has Int_0_to_2 $.f3                = 1;
-has Int_0_to_2 $.grid              = 1;
+has Int_0_to_2 $.grid;                          # removed 13.06.2021
 has Int_0_to_2 $.table-expand      = 1;
 has Str        $.decimal-separator = '.';
 has Str        $.table-name        = '';
@@ -85,31 +85,37 @@ method print-table (
         UInt       :$min-col-width     = $!min-col-width,
         UInt       :$progress-bar      = $!progress-bar,
         UInt       :$tab-width         = $!tab-width,
-        Int_0_or_1 :$choose-columns    = $!choose-columns,  # 12.06.2021 - remove
-        Int_0_or_1 :$keep-header       = $!keep-header,
+        Int_0_or_1 :$choose-columns    = $!choose-columns,  # removed 12.06.2021
+        Int_0_or_1 :$keep-header       = $!keep-header,     # removed 13.06.2021
         Int_0_or_1 :$mouse             = $!mouse,
         Int_0_or_1 :$save-screen       = $!save-screen,
         Int_0_or_1 :$squash-spaces     = $!squash-spaces,
-        Int_0_to_2 :$clear-screen      = $!clear-screen,    # 12.06.2021 - remove
+        Int_0_to_2 :$clear-screen      = $!clear-screen,    # removed 12.06.2021
         Int_0_to_2 :$color             = $!color,
         Int_0_to_2 :$f3                = $!f3,
-        Int_0_to_2 :$grid              = $!grid,
+        Int_0_to_2 :$grid              = $!grid,            # removed 13.06.2021
         Int_0_to_2 :$table-expand      = $!table-expand,
         Str        :$decimal-separator = $!decimal-separator,
         Str        :$table-name        = $!table-name,
         Str        :$prompt            = $!prompt,
         Str        :$undef             = $!undef,
     ) {
-    %!o = :$max-rows, :$min-col-width, :$progress-bar, :$tab-width, :$keep-header, :$mouse, :$save-screen,
-          :$squash-spaces, :$color, :$f3, :$grid, :$table-expand, :$decimal-separator, :$table-name, :$prompt, :$undef;
+    %!o = :$max-rows, :$min-col-width, :$progress-bar, :$tab-width, :$mouse, :$save-screen, :$squash-spaces,
+          :$color, :$f3, :$table-expand, :$decimal-separator, :$table-name, :$prompt, :$undef;
     self!_init_term();
 
     #######################################################################################################
-    if $clear-screen.defined {          # 12.06.2021 - remove
+    if $clear-screen.defined {          # removed 12.06.2021
         $!tc.pause( ( 'Continue with ENTER', ), :prompt( 'The option `clear-screen` has been removed. See option `save-screen`' ) );
     }
-    if $choose-columns.defined {        # 12.06.2021 - remove
+    if $choose-columns.defined {        # removed 12.06.2021
         $!tc.pause( ( 'Continue with ENTER', ), :prompt( 'The option `choose-columns` has been removed.' ) );
+    }
+    if $keep-header.defined {           # removed 13.06.2021
+        $!tc.pause( ( 'Continue with ENTER', ), :prompt( 'The option `keep-header` has been removed.' ) );
+    }
+    if $grid.defined {                  # removed 13.06.2021
+        $!tc.pause( ( 'Continue with ENTER', ), :prompt( 'The option `grid` has been removed.' ) );
     }
     #######################################################################################################
 
@@ -125,7 +131,7 @@ method print-table (
         $!thsd_sep = '_';
     }
     $!tab_w = %!o<tab-width>;
-    if %!o<grid> && %!o<tab-width> %% 2 {
+    if %!o<tab-width> %% 2 {
         $!tab_w++;
     }
     self!_row_count( @!tbl_orig.elems );
@@ -173,29 +179,7 @@ method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header 
             $header.push: %!o<prompt>;
         }
         my $col_names = $tbl_print.shift;
-        my $header_sep = self!_header_separator();
-        if %!o<keep-header> {
-            if %!o<grid> == 1 {
-                $header.push:              $col_names, $header_sep;
-            }
-            elsif %!o<grid> == 2 {
-                $header.push: $header_sep, $col_names, $header_sep;
-            }
-            else {
-                $header.push:              $col_names;
-            }
-        }
-        else {
-            if %!o<grid> == 1 {
-                $tbl_print.unshift:              $col_names, $header_sep;
-            }
-            elsif %!o<grid> == 2 {
-                $tbl_print.unshift: $header_sep, $col_names, $header_sep;
-            }
-            else {
-                $tbl_print.unshift:              $col_names;
-            }
-        }
+        $header.push: $col_names, self!_header_separator();
         if $!info_row {
             if print-columns( $!info_row ) > $table_w {
                 $tbl_print.push: to-printwidth( $!info_row, $table_w - 3 ).[0] ~ '...';
@@ -204,26 +188,11 @@ method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header 
                 $tbl_print.push: $!info_row ~ ' ' x ( $table_w - $!info_row.chars ); #
             }
         }
-        self!_reset_search(); # map_indexes has unshifted 0.
     }
     my $return = %!map_return_wr_table<last>;
     my @idxs_tbl_print;
     if $!filter.chars {
-        if %!o<keep-header> {
-            @idxs_tbl_print = @!map_indexes.map: { $_ - 1 };
-        }
-        else {
-            if %!o<grid> {
-                @idxs_tbl_print = @!map_indexes.map: { $_ + %!o<grid> };
-                if %!o<grid> == 1 {
-                    @idxs_tbl_print.unshift: 0, 1;
-                }
-                elsif %!o<grid> == 2 {
-                    @idxs_tbl_print.unshift: 0, 1, 2;
-                }
-            }
-        }
-        @!map_indexes.unshift: 0;
+        @idxs_tbl_print = @!map_indexes.map: { $_ - 1 }; # because of the removed header row from $tbl_print
         $return = %!map_return_wr_table<returned_from_filtered_table>;
     }
     my $footer;
@@ -243,8 +212,7 @@ method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header 
         }
         if ( $!row_count <= 1 ) {
             # Choose
-            my $tmp := %!o<keep-header> ?? $header !! $tbl_print;
-            $!tc.pause( ( 'Empty table!', ), :prompt( $tmp.join: "\n" ), :0layout );
+            $!tc.pause( ( 'Empty table!', ), :prompt( $header.join: "\n" ), :0layout );
             return %!map_return_wr_table<last>;
         }
         %*ENV<TC_RESET_AUTO_UP> = 0;
@@ -280,10 +248,7 @@ method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header 
         else {
             if $old_row == $row {
                 if $row == 0 {
-                    if ! %!o<keep-header> {
-                        return $return;
-                    }
-                    elsif %!o<table-expand> {
+                    if %!o<table-expand> {
                         if $row_is_expanded {
                             return $return;
                         }
@@ -309,38 +274,12 @@ method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header 
                 $!tc.pause( ( 'Close', ), :prompt( $!info_row ) );
                 next;
             }
-            if %!o<keep-header> {
-                $row++;
-            }
-            else {
-                if %!o<grid> == 1 {
-                    if $row == 1 {
-                        #$row = 0;
-                        next;
-                    }
-                    if $row > 1 {
-                        $row--;
-                    }
-                }
-                elsif %!o<grid> == 2 {
-                    if $row == 0 | 2 {
-                        #$row = 1;
-                        next;
-                    }
-                    if $row == 1 {
-                        $row--;
-                    }
-                    else {
-                        $row -= 2;
-                    }
-                }
-            }
             my $orig_row;
             if @!map_indexes.elems {
                 $orig_row = @!map_indexes[$row];
             }
             else {
-                $orig_row = $row;
+                $orig_row = $row + 1; # because $tbl_print has no header row while $tbl_orig has a header row
             }
             self!_print_single_table_row( $orig_row, $footer );
         }
@@ -570,13 +509,7 @@ method !_calc_avail_col_width( $term_w ) {
 
 method !_table_row_to_string {
     my Int @idx_cols = 0 .. @!tbl_copy[0].end;
-    my Str $tab;
-    if %!o<grid> {
-        $tab = ( ' ' x $!tab_w div 2 ) ~ '|' ~ ( ' ' x $!tab_w div 2 );
-    }
-    else {
-        $tab = ' ' x $!tab_w;
-    }
+    my Str $tab = ( ' ' x $!tab_w div 2 ) ~ '|' ~ ( ' ' x $!tab_w div 2 );
     my ( Int $count, Int $step ) = self!_set_progress_bar;       #
     my $ds = %!o<decimal-separator>;
     my @promise;
@@ -908,14 +841,11 @@ Keys to move around:
 =item the C<Home> key (or C<Ctrl-A>) to jump to the first row of the table, the C<End> key (or C<Ctrl-E>) to jump to the last
 row of the table.
 
-With I<keep-header> set to C<0> the C<Return> key closes the table if the cursor is on the header row.
+If I<table-expand> is set to C<0>, the C<Return> key closes the table if the cursor is on the first row.
 
-If I<keep-header> is enabled (set to C<1> or C<2>) and I<table-expand> is set to C<0>, the C<Return> key closes the table if the cursor is on
-the first row.
-
-If I<keep-header> and I<table-expand> are enabled and the cursor is on the first row, pressing C<Return> three times in
-succession closes the table. If I<table-expand> is set to C<1> and the cursor is auto-jumped to the first row, it is
-required only one C<Return> to close the table.
+If I<table-expand> is enabled and the cursor is on the first row, pressing C<Return> three times in succession closes
+the table. If I<table-expand> is set to C<1> and the cursor is auto-jumped to the first row, it is required only one
+C<Return> to close the table.
 
 If the cursor is not on the first row:
 
@@ -923,8 +853,7 @@ If the cursor is not on the first row:
 
 =item1 with the option I<table-expand> enabled each column of the selected row is output in its own line preceded by the
 column name if C<Return> is pressed. Another C<Return> closes this output and goes back to the table output. If a row is
-selected twice in succession, the pointer jumps to the head of the table or to the first row if I<keep-header> is
-enabled.
+selected twice in succession, the pointer jumps to the first row.
 
 If the width of the window is changed and the option I<table-expand> is enabled, the user can rewrite the screen by
 choosing a row.
@@ -973,90 +902,6 @@ Allowed values: a character with a print width of C<1>. If an invalid values is 
 to the default value.
 
 Default: . (dot)
-
-=head2 keep-header
-
-If I<keep-header> is set to C<0>, the table header is shown on top of the first page.
-
-=begin code
-
-    .----------------------------.    .----------------------------.    .----------------------------.
-    |col1   col2     col3   col3 |    |.....  .......  .....  .....|    |.....  .......  .....  .....|
-    |.....  .......  .....  .....|    |.....  .......  .....  .....|    |.....  .......  .....  .....|
-    |.....  .......  .....  .....|    |.....  .......  .....  .....|    |                            |
-    |.....  .......  .....  .....|    |.....  .......  .....  .....|    |                            |
-    |.....  .......  .....  .....|    |.....  .......  .....  .....|    |                            |
-    |.....  .......  .....  .....|    |.....  .......  .....  .....|    |                            |
-    |.....  .......  .....  .....|    |.....  .......  .....  .....|    |                            |
-    |.....  .......  .....  .....|    |.....  .......  .....  .....|    |                            |
-    | 1/3                        |    | 2/3                        |    | 3/3                        |
-    '----------------------------'    '----------------------------'    '----------------------------'
-
-=end code
-
-If I<keep-header> is set to C<1>, the table header is shown on top of each page.
-
-=begin code
-
-    .----------------------------.    .----------------------------.    .----------------------------.
-    |col1   col2     col3   col3 |    |col1   col2     col3   col4 |    |col1   col2     col3   col4 |
-    |.....  .......  .....  .....|    |.....  .......  .....  .....|    |.....  .......  .....  .....|
-    |.....  .......  .....  .....|    |.....  .......  .....  .....|    |.....  .......  .....  .....|
-    |.....  .......  .....  .....|    |.....  .......  .....  .....|    |.....  .......  .....  .....|
-    |.....  .......  .....  .....|    |.....  .......  .....  .....|    |                            |
-    |.....  .......  .....  .....|    |.....  .......  .....  .....|    |                            |
-    |.....  .......  .....  .....|    |.....  .......  .....  .....|    |                            |
-    |.....  .......  .....  .....|    |.....  .......  .....  .....|    |                            |
-    | 1/3                        |    | 2/3                        |    | 3/3                        |
-    '----------------------------'    '----------------------------'    '----------------------------'
-
-=end code
-
-Default: 1
-
-=head2 grid
-
-If I<grid> is set to C<0>, the table is shown with no grid.
-
-=begin code
-
-    .----------------------------.
-    |col1  col2     col3   col3  |
-    |....  .......  .....  ..... |
-    |....  .......  .....  ..... |
-    |....  .......  .....  ..... |
-    |....  .......  .....  ..... |
-    |....  .......  .....  ..... |
-    |....  .......  .....  ..... |
-    |....  .......  .....  ..... |
-    |....  .......  .....  ..... |
-    |                            |
-    '----------------------------'
-
-=end code
-
-If I<grid> is set to C<1>, lines separate the columns from each other and the header from the body.
-
-=begin code
-
-    .----------------------------.
-    |col1 | col2   | col3 | col3 |
-    |-----|--------|------|------|
-    |.... | ...... | .... | .... |
-    |.... | ...... | .... | .... |
-    |.... | ...... | .... | .... |
-    |.... | ...... | .... | .... |
-    |.... | ...... | .... | .... |
-    |.... | ...... | .... | .... |
-    |.... | ...... | .... | .... |
-    |.... | ...... | .... | .... |
-    '----------------------------'
-
-=end code
-
-I<grid> set to C<2> is like I<grid> set to C<1> plus a separator line on top of the header row.
-
-Default: 1
 
 =head2 max-rows
 
