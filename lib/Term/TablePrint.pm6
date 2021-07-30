@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.5.4>;
+unit class Term::TablePrint:ver<1.5.5>;
 
 use Term::Choose;
 use Term::Choose::LineFold;
@@ -195,7 +195,7 @@ method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header 
         @idxs_tbl_print = @!map_indexes.map: { $_ - 1 }; # because of the removed header row from $tbl_print
         $return = %!map_return_wr_table<returned_from_filtered_table>;
     }
-    my $footer;
+    my Str $footer = '';
     if %!o<table-name> {
         $footer = '- ' ~ %!o<table-name>;
         if $!filter.chars {

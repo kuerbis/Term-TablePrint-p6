@@ -1,6 +1,9 @@
 Revision history for Term::TablePrint
 
 
+1.5.5  2021-07-30
+        - Bugfix: Type check failed in binding to parameter '$footer' [GH #3 andinus].
+
 1.5.4  2021-06-13
         - Removed options 'grid' and 'keep-header'.
 
