@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.5.5>;
+unit class Term::TablePrint:ver<1.5.6>;
 
 use Term::Choose;
 use Term::Choose::LineFold;
@@ -197,7 +197,7 @@ method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header 
     }
     my Str $footer = '';
     if %!o<table-name> {
-        $footer = '- ' ~ %!o<table-name>;
+        $footer = '  ' ~ %!o<table-name>;
         if $!filter.chars {
             $footer ~= '  ' ~ ( %!o<f3> == 1 ?? 'rx:i/' !! 'rx/' ) ~ $!filter ~ '/';
         }
@@ -598,7 +598,7 @@ method !_search {
     if ! %!o<f3> {
         return;
     }
-    print "\r", clr-lines-to-bot;
+    print "\r", clear-to-end-of-screen();
     print show-cursor;
     my $prompt = 'Search pattern: ';
     my ( $string, $regex );
@@ -680,7 +680,7 @@ method !_init_progress_bar ( $times ) {
     $!p_bar = {};
     my Int $count_cells = $!row_count * @!tbl_orig[0].elems;
     if %!o<progress-bar> && %!o<progress-bar> < $count_cells {
-        print clear();
+        print clear-screen();
         print 'Computing: ';
         $!p_bar<count_progress_bars> = $times;
         if $count_cells / %!o<progress-bar> > 50 {

@@ -1,29 +1,31 @@
 {
-  "authors" : [
+  "authors": [
     "kuerbis"
   ],
-  "build-depends" : [ ],
-  "depends" : [
-    "Term::Choose:ver<1.6.8+>",
-    "Term::Choose::Util:ver<1.3.4+>"
+  "build-depends": [
   ],
-  "description" : "Print a table to the terminal and browse it interactively.",
-  "license" : "Artistic-2.0",
-  "name" : "Term::TablePrint",
-  "perl" : "6.d",
-  "provides" : {
-    "Term::TablePrint" : "lib/Term/TablePrint.pm6"
+  "depends": [
+    "Term::Choose:ver<1.7.3+>",
+    "Term::Choose::Util:ver<1.3.6+>"
+  ],
+  "description": "Print a table to the terminal and browse it interactively.",
+  "license": "Artistic-2.0",
+  "name": "Term::TablePrint",
+  "perl": "6.d",
+  "provides": {
+    "Term::TablePrint": "lib/Term/TablePrint.pm6"
   },
-  "resources" : [ ],
-  "source-url" : "git://github.com/kuerbis/Term-TablePrint-p6.git",
-  "tags" : [
+  "resources": [
+  ],
+  "source-url": "git://github.com/kuerbis/Term-TablePrint-p6.git",
+  "tags": [
     "cli",
     "table",
     "terminal",
     "text"
   ],
-  "test-depends" : [
+  "test-depends": [
     "Test"
   ],
-  "version" : "1.5.5"
+  "version": "1.5.6"
 }
