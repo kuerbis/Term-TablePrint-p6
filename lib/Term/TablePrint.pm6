@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.5.6>;
+unit class Term::TablePrint:ver<1.5.7>;
 
 use Term::Choose;
 use Term::Choose::LineFold;
@@ -31,18 +31,18 @@ has Str        $.table-name        = '';
 has Str        $.prompt            = '';
 has Str        $.undef             = '';
 
-has     @!tbl_orig;
-has     @!tbl_copy;
-has Int @!w_heads;
-has     @!w_cols;
-has     @!w_int;
-has     @!w_fract;
-has Int @!w_cols_calc;
-has     @!portions;
+has       @!tbl_orig;
+has       @!tbl_copy;
+has Int   @!w_heads;
+has       @!w_cols;
+has       @!w_int;
+has       @!w_fract;
+has Int   @!w_cols_calc;
+has Array @!portions;
 
-has $!filter = '';
-has @!map_indexes;
-has %!map_return_wr_table = :0last, :1window_width_changed, :2enter_search_string, :3returned_from_filtered_table;
+has Str $!filter_string = '';
+has Int @!map_indexes;
+has     %!map_return_wr_table = :0last, :1window_width_changed, :2enter_search_string, :3returned_from_filtered_table;
 
 has Int  $!row_count;
 has Int  $!tab_w;
@@ -142,7 +142,7 @@ method print-table (
     my ( Int $term_w, Int $table_w, Array $tbl_print, Array $header );
 
     loop {
-        my $next = self!_write_table( $term_w, $table_w, $tbl_print, $header );
+        my Int $next = self!_write_table( $term_w, $table_w, $tbl_print, $header );
         if $next == %!map_return_wr_table<last> {
             last;
         }
@@ -178,7 +178,7 @@ method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header 
         if %!o<prompt>.chars {
             $header.push: %!o<prompt>;
         }
-        my $col_names = $tbl_print.shift;
+        my Str $col_names = $tbl_print.shift;
         $header.push: $col_names, self!_header_separator();
         if $!info_row {
             if print-columns( $!info_row ) > $table_w {
@@ -189,17 +189,17 @@ method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header 
             }
         }
     }
-    my $return = %!map_return_wr_table<last>;
-    my @idxs_tbl_print;
-    if $!filter.chars {
+    my Int $return = %!map_return_wr_table<last>;
+    my Int @idxs_tbl_print;
+    if $!filter_string.chars {
         @idxs_tbl_print = @!map_indexes.map: { $_ - 1 }; # because of the removed header row from $tbl_print
         $return = %!map_return_wr_table<returned_from_filtered_table>;
     }
     my Str $footer = '';
     if %!o<table-name> {
         $footer = '  ' ~ %!o<table-name>;
-        if $!filter.chars {
-            $footer ~= '  ' ~ ( %!o<f3> == 1 ?? 'rx:i/' !! 'rx/' ) ~ $!filter ~ '/';
+        if $!filter_string.chars {
+            $footer ~= '  ' ~ ( %!o<f3> == 1 ?? 'rx:i/' !! 'rx/' ) ~ $!filter_string ~ '/';
         }
     }
     my Int $old_row = 0;
@@ -230,7 +230,7 @@ method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header 
                 return %!map_return_wr_table<window_width_changed>;
             }
             elsif $row == -13 {     # `choose` returns -13 if `F3` was pressed
-                if $!filter.chars {
+                if $!filter_string.chars {
                     self!_reset_search();
                 }
                 return %!map_return_wr_table<enter_search_string>;
@@ -274,7 +274,7 @@ method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header 
                 $!tc.pause( ( 'Close', ), :prompt( $!info_row ) );
                 next;
             }
-            my $orig_row;
+            my Int $orig_row;
             if @!map_indexes.elems {
                 $orig_row = @!map_indexes[$row];
             }
@@ -296,10 +296,10 @@ method !_print_single_table_row ( Int $row, Str $footer ) {
     }
     my Str $separator = ' : ';
     my Int $sep_w = $separator.chars;
-    my $col_w = $term_w - ( $key_w + $sep_w + 1 ); #
-    my @lines = ' Close with ENTER', ' ';
+    my Int $col_w = $term_w - ( $key_w + $sep_w + 1 ); #
+    my Str @lines = ' Close with ENTER', ' ';
     for ^@!tbl_orig[0] -> $col {
-        my $col_name = ( @!tbl_orig[0][$col] // %!o<undef> );
+        my Str $col_name = ( @!tbl_orig[0][$col] // %!o<undef> );
         if $col_name ~~ Buf {
             $col_name = $col_name.gist;
         }
@@ -310,7 +310,7 @@ method !_print_single_table_row ( Int $row, Str $footer ) {
         $col_name.=subst( / \v+ /,  '  ', :g );
         $col_name.=subst( / <:Cc+:Noncharacter_Code_Point+:Cs> /, '', :g );
         my Str $key = to-printwidth( $col_name, $key_w, False ).[0];
-        my $cell = @!tbl_orig[$row][$col];
+        my $cell = @!tbl_orig[$row][$col] // $!undef;
         if %!o<color> {
             $cell.=subst( / \e \[ <[\d;]>* m /, '', :g );
         }
@@ -329,8 +329,8 @@ method !_print_single_table_row ( Int $row, Str $footer ) {
 
 method !_copy_table {
     my ( Int $count, Int $step ) = self!_set_progress_bar;       #
-    my @promise;
-    my $lock = Lock.new();
+    my Promise @promise;
+    my Lock $lock = Lock.new();
     for @!portions -> $range {
         @promise.push: start {
             do for |$range -> $row {
@@ -364,7 +364,7 @@ method !_copy_table {
             }
         };
     }
-    @!tbl_copy= [];
+    @!tbl_copy = ();
     for await @promise -> @portion {
         for @portion -> @p_rows {
             @!tbl_copy.push: @p_rows;
@@ -384,14 +384,14 @@ method !_calc_col_width {
     for @idx_cols -> $col {
        @!w_heads.BIND-POS( $col, print-columns( @!tbl_copy.AT-POS(0).AT-POS($col) ) );
     }
-    my $size = @!tbl_copy[0].elems;
-    my @w_cols[$size]  = ( 1 xx $size );
-    my @w_int[$size]   = ( 0 xx $size );
-    my @w_fract[$size] = ( 0 xx $size );
-    my $header_idx = @!portions[0].shift; # already done: w_heads 
-    my $ds = %!o<decimal-separator>;
-    my @promise;
-    my $lock = Lock.new();
+    my Int $size = @!tbl_copy[0].elems;
+    my Int @w_cols[$size]  = ( 1 xx $size );
+    my Int @w_int[$size]   = ( 0 xx $size );
+    my Int @w_fract[$size] = ( 0 xx $size );
+    my Int $header_idx = @!portions[0].shift; # already done: w_heads 
+    my Str $ds = %!o<decimal-separator>;
+    my Promise @promise;
+    my Lock $lock = Lock.new();
     for @!portions -> $range {
         my @cache;
         @promise.push: start {
@@ -489,7 +489,7 @@ method !_calc_avail_col_width( $term_w ) {
         if $rest {
 
             REST: loop {
-                my $count = 0;
+                my Int $count = 0;
                 for ^@w_cols_tmp -> $i {
                     if @w_cols_tmp.AT-POS($i) < @!w_cols_calc.AT-POS($i) {
                         @w_cols_tmp.BIND-POS( $i, @w_cols_tmp.AT-POS($i) + 1 );
@@ -511,9 +511,9 @@ method !_table_row_to_string {
     my Int @idx_cols = 0 .. @!tbl_copy[0].end;
     my Str $tab = ( ' ' x $!tab_w div 2 ) ~ '|' ~ ( ' ' x $!tab_w div 2 );
     my ( Int $count, Int $step ) = self!_set_progress_bar;       #
-    my $ds = %!o<decimal-separator>;
-    my @promise;
-    my $lock = Lock.new();
+    my Str $ds = %!o<decimal-separator>;
+    my Promise @promise;
+    my Lock $lock = Lock.new();
     for @!portions -> $range {
         my @cache;
         @promise.push: start {
@@ -557,11 +557,11 @@ method !_table_row_to_string {
                         $str = $str ~ unicode-sprintf( @!tbl_copy.AT-POS($row).AT-POS($col), @!w_cols_calc.AT-POS($col), @cache );
                     }
                     if %!o<color> && @!tbl_orig.AT-POS($row).AT-POS($col).defined { #
-                        my @color = @!tbl_orig.AT-POS($row).AT-POS($col).comb( / \e \[ <[\d;]>* m / );
-                        if @color.elems {
-                            $str.=subst( / \x[feff] /, { @color.shift }, :g );
-                            if @color.elems {
-                                $str = $str ~ @color[*-1];
+                        my Str @colors = @!tbl_orig.AT-POS($row).AT-POS($col).comb( / \e \[ <[\d;]>* m / );
+                        if @colors.elems {
+                            $str.=subst( / \x[feff] /, { @colors.shift }, :g );
+                            if @colors.elems {
+                                $str = $str ~ @colors[*-1];
                             }
                         }
                     }
@@ -600,8 +600,8 @@ method !_search {
     }
     print "\r", clear-to-end-of-screen();
     print show-cursor;
-    my $prompt = 'Search pattern: ';
-    my ( $string, $regex );
+    my Str $prompt = 'Search pattern: ';
+    my ( Str $string, Regex $regex );
 
     READ: loop {
         if ( try require Readline ) === Nil {
@@ -638,14 +638,14 @@ method !_search {
         $!tc.pause( ( 'Continue with ENTER', ), :prompt( 'No matches found.' ), :0layout );
         return;
     }
-    $!filter = $string;
+    $!filter_string = $string;
     return;
 }
 
 
 method !_reset_search {
     @!map_indexes = [];
-    $!filter = '';
+    $!filter_string = '';
 }
 
 
@@ -667,11 +667,11 @@ method !_split_work_for_threads {
         last if $threads == 1;
         $threads = $threads div 2;
     }
-    my $size = $!row_count div $threads;
+    my Int $size = $!row_count div $threads;
     if ( $!row_count % $threads ) {
         $size++;
     }
-    my @idx_rows = 0 .. $!row_count - 1;
+    my Int @idx_rows = 0 .. $!row_count - 1;
     @!portions = ( ^$threads ).map: { [ @idx_rows.splice: 0, $size ] };
 }
 
@@ -748,7 +748,7 @@ method !_header_separator {
 
 
 method !_print_term_not_wide_enough_message {
-    my $prompt1 = 'Terminal window is not wide enough to print this table.';
+    my Str $prompt1 = 'Terminal window is not wide enough to print this table.';
     $!tc.pause( [ 'Press ENTER to show the column names.' ], :prompt( $prompt1 ) );
     #my Str $prompt2 = 'Reduce the number of columns".' ~ "\n" ~ 'Close with ENTER.';
     my Str $prompt2 = 'Close with ENTER.';
@@ -1027,7 +1027,7 @@ Matthäus Kiem <cuer2s@gmail.com>
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright 2016-2020 Matthäus Kiem.
+Copyright 2016-2021 Matthäus Kiem.
 
 This library is free software; you can redistribute it and/or modify it under the Artistic License 2.0.
 
