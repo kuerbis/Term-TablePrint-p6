@@ -1,6 +1,12 @@
 Revision history for Term::TablePrint
 
 
+1.5.8  2021-08-17
+        - Renamed the option 'f3' to 'search'.
+        - Changed the search key from 'F3' to 'Ctrl-F'.
+        - Page up/down: changed from 'Ctrl-B/Ctrl-F' to 'Ctrl-P/Ctrl-N'.
+        - Renamed option 'table-name' to 'footer'.
+
 1.5.7  2021-08-16
         - Code refactoring.
 

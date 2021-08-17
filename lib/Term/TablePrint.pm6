@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.5.7>;
+unit class Term::TablePrint:ver<1.5.8>;
 
 use Term::Choose;
 use Term::Choose::LineFold;
@@ -15,19 +15,15 @@ has UInt       $.max-rows          = 50_000;
 has UInt       $.min-col-width     = 30;
 has UInt       $.progress-bar      = 5_000;
 has UInt       $.tab-width         = 2;
-has Int_0_or_1 $.choose-columns;                # removed 12.06.2021
-has Int_0_or_1 $.keep-header;                   # removed 13.06.2021
 has Int_0_or_1 $.loop              = 0; # private
 has Int_0_or_1 $.mouse             = 0;
 has Int_0_or_1 $.save-screen       = 0;
 has Int_0_or_1 $.squash-spaces     = 0;
-has Int_0_to_2 $.clear-screen;                  # removed 12.06.2021
 has Int_0_to_2 $.color             = 0;
-has Int_0_to_2 $.f3                = 1;
-has Int_0_to_2 $.grid;                          # removed 13.06.2021
+has Int_0_to_2 $.search            = 1;
 has Int_0_to_2 $.table-expand      = 1;
 has Str        $.decimal-separator = '.';
-has Str        $.table-name        = '';
+has Str        $.footer            = '';
 has Str        $.prompt            = '';
 has Str        $.undef             = '';
 
@@ -85,40 +81,20 @@ method print-table (
         UInt       :$min-col-width     = $!min-col-width,
         UInt       :$progress-bar      = $!progress-bar,
         UInt       :$tab-width         = $!tab-width,
-        Int_0_or_1 :$choose-columns    = $!choose-columns,  # removed 12.06.2021
-        Int_0_or_1 :$keep-header       = $!keep-header,     # removed 13.06.2021
         Int_0_or_1 :$mouse             = $!mouse,
         Int_0_or_1 :$save-screen       = $!save-screen,
         Int_0_or_1 :$squash-spaces     = $!squash-spaces,
-        Int_0_to_2 :$clear-screen      = $!clear-screen,    # removed 12.06.2021
         Int_0_to_2 :$color             = $!color,
-        Int_0_to_2 :$f3                = $!f3,
-        Int_0_to_2 :$grid              = $!grid,            # removed 13.06.2021
+        Int_0_to_2 :$search            = $!search,
         Int_0_to_2 :$table-expand      = $!table-expand,
         Str        :$decimal-separator = $!decimal-separator,
-        Str        :$table-name        = $!table-name,
+        Str        :$footer            = $!footer,
         Str        :$prompt            = $!prompt,
         Str        :$undef             = $!undef,
     ) {
     %!o = :$max-rows, :$min-col-width, :$progress-bar, :$tab-width, :$mouse, :$save-screen, :$squash-spaces,
-          :$color, :$f3, :$table-expand, :$decimal-separator, :$table-name, :$prompt, :$undef;
+          :$color, :$search, :$table-expand, :$decimal-separator, :$footer, :$prompt, :$undef;
     self!_init_term();
-
-    #######################################################################################################
-    if $clear-screen.defined {          # removed 12.06.2021
-        $!tc.pause( ( 'Continue with ENTER', ), :prompt( 'The option `clear-screen` has been removed. See option `save-screen`' ) );
-    }
-    if $choose-columns.defined {        # removed 12.06.2021
-        $!tc.pause( ( 'Continue with ENTER', ), :prompt( 'The option `choose-columns` has been removed.' ) );
-    }
-    if $keep-header.defined {           # removed 13.06.2021
-        $!tc.pause( ( 'Continue with ENTER', ), :prompt( 'The option `keep-header` has been removed.' ) );
-    }
-    if $grid.defined {                  # removed 13.06.2021
-        $!tc.pause( ( 'Continue with ENTER', ), :prompt( 'The option `grid` has been removed.' ) );
-    }
-    #######################################################################################################
-
     if ! @!tbl_orig.elems {
         $!tc.pause( ( 'Close with ENTER', ), :prompt( '"print-table": Empty table!' ) );
         self!_end_term;
@@ -196,10 +172,10 @@ method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header 
         $return = %!map_return_wr_table<returned_from_filtered_table>;
     }
     my Str $footer = '';
-    if %!o<table-name> {
-        $footer = '  ' ~ %!o<table-name>;
+    if %!o<footer> {
+        $footer = '  ' ~ %!o<footer>;
         if $!filter_string.chars {
-            $footer ~= '  ' ~ ( %!o<f3> == 1 ?? 'rx:i/' !! 'rx/' ) ~ $!filter_string ~ '/';
+            $footer ~= '  ' ~ ( %!o<search> == 1 ?? 'rx:i/' !! 'rx/' ) ~ $!filter_string ~ '/';
         }
     }
     my Int $old_row = 0;
@@ -219,8 +195,8 @@ method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header 
         # Choose
         my Int $row = $!tc.choose(
             @idxs_tbl_print.elems ?? $tbl_print[@idxs_tbl_print] !! $tbl_print,
-            :prompt( $header.join: "\n" ), :ll( $table_w ), :default( $old_row ),
-            :1index, :2layout, :color( %!o<color> ), :$footer
+            :prompt( $header.join: "\n" ), :ll( $table_w ), :default( $old_row ), :1index, :2layout,
+            :color( %!o<color> ), :$footer
         );
         if ! $row.defined {
             return $return;
@@ -281,14 +257,14 @@ method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header 
             else {
                 $orig_row = $row + 1; # because $tbl_print has no header row while $tbl_orig has a header row
             }
-            self!_print_single_table_row( $orig_row, $footer );
+            self!_print_single_table_row( $orig_row, $footer, %!o<search> );
         }
         %*ENV<TC_RESET_AUTO_UP>:delete;
     }
 }
 
 
-method !_print_single_table_row ( Int $row, Str $footer ) {
+method !_print_single_table_row ( Int $row, Str $footer, Int $search ) {
     my Int $term_w = get-term-size().[0] + 1;
     my Int $key_w = @!w_heads.max + 1; #
     if $key_w > $term_w div 100 * 33 {
@@ -323,7 +299,7 @@ method !_print_single_table_row ( Int $row, Str $footer ) {
         @lines.push: ' ';
     }
     @lines.pop;
-    $!tc.pause( @lines, :prompt( '' ), :2layout, :$footer );
+    $!tc.pause( @lines, :prompt( '' ), :2layout, :$footer, :$search );
 }
 
 
@@ -595,7 +571,7 @@ method !_table_row_to_string {
 
 
 method !_search {
-    if ! %!o<f3> {
+    if ! %!o<search> {
         return;
     }
     print "\r", clear-to-end-of-screen();
@@ -618,7 +594,7 @@ method !_search {
         print up( 1 );
         print "\r{$prompt}{$string}";
         try {
-            $regex = %!o<f3> == 1 ?? rx:i/<$string>/ !! rx/<$string>/;
+            $regex = %!o<search> == 1 ?? rx:i/<$string>/ !! rx/<$string>/;
             'Teststring' ~~ $regex;
         }
         if $! {
@@ -811,7 +787,7 @@ cursor reaches the topmost line, the previous page is shown automatically if it 
 
 If the terminal is too narrow to print the table, the columns are adjusted to the available width automatically.
 
-If the option table-expand is enabled and a row is selected with C<Return>, each column of that row is output in its own
+If the option table-expand is enabled and a row is selected with K<Return>, each column of that row is output in its own
 line preceded by the column name. This might be useful if the columns were cut due to the too low terminal width.
 
 The following modifications are made (at a copy of the original data) to the table elements before the output.
@@ -822,7 +798,8 @@ Vertical spaces (C<\v>) are squashed to two spaces
 
 Control characters, code points of the surrogate ranges and non-characters are removed.
 
-If the option I<squash-spaces> is enabled leading and trailing spaces are removed from the array elements and spaces are squashed to a single space.
+If the option I<squash-spaces> is enabled leading and trailing spaces are removed from the array elements and spaces are
+squashed to a single space.
 
 If an element looks like a number it is left-justified, else it is right-justified.
 
@@ -832,27 +809,28 @@ If an element looks like a number it is left-justified, else it is right-justifi
 
 Keys to move around:
 
-=item the C<ArrowDown> key (or the C<j> key) to move down and  the C<ArrowUp> key (or the C<k> key) to move up.
+=item the K<ArrowDown> key (or the K<j> key) to move down and  the K<ArrowUp> key (or the K<k> key) to move up.
 
-=item the C<PageUp> key (or C<Ctrl-B>) to go back one page, the C<PageDown> key (or C<Ctrl-F>) to go forward one page.
+=item the K<PageUp> key (or K<Ctrl-P>) to go to the previous page, the K<PageDown> key (or K<Ctrl-N>) to go to the next
+page.
 
-=item the C<Insert> key to go back 10 pages, the C<Delete> key to go forward 10 pages.
+=item the K<Insert> key to go back 10 pages, the K<Delete> key to go forward 10 pages.
 
-=item the C<Home> key (or C<Ctrl-A>) to jump to the first row of the table, the C<End> key (or C<Ctrl-E>) to jump to the last
-row of the table.
+=item the K<Home> key (or K<Ctrl-A>) to jump to the first row of the table, the K<End> key (or K<Ctrl-E>) to jump to the
+last row of the table.
 
-If I<table-expand> is set to C<0>, the C<Return> key closes the table if the cursor is on the first row.
+If I<table-expand> is set to C<0>, the K<Return> key closes the table if the cursor is on the first row.
 
-If I<table-expand> is enabled and the cursor is on the first row, pressing C<Return> three times in succession closes
+If I<table-expand> is enabled and the cursor is on the first row, pressing K<Return> three times in succession closes
 the table. If I<table-expand> is set to C<1> and the cursor is auto-jumped to the first row, it is required only one
-C<Return> to close the table.
+K<Return> to close the table.
 
 If the cursor is not on the first row:
 
-=item1 with the option I<table-expand> disabled the cursor jumps to the table head if C<Return> is pressed.
+=item1 with the option I<table-expand> disabled the cursor jumps to the table head if K<Return> is pressed.
 
 =item1 with the option I<table-expand> enabled each column of the selected row is output in its own line preceded by the
-column name if C<Return> is pressed. Another C<Return> closes this output and goes back to the table output. If a row is
+column name if K<Return> is pressed. Another K<Return> closes this output and goes back to the table output. If a row is
 selected twice in succession, the pointer jumps to the first row.
 
 If the width of the window is changed and the option I<table-expand> is enabled, the user can rewrite the screen by
@@ -903,6 +881,10 @@ to the default value.
 
 Default: . (dot)
 
+=head2 footer
+
+If set (string), I<footer> is added in the bottom line.
+
 =head2 max-rows
 
 Set the maximum number of used table rows. The used table rows are kept in memory.
@@ -940,9 +922,20 @@ Default: 5_000
 
 1 - use the alternate screen
 
+=head2 search
+
+Set the behavior of K<Ctrl-F>.
+
+0 - off
+
+1 - case-insensitive search (default)
+
+2 - case-sensitive search
+
 =head2 squash-spaces
 
-If I<squash-spaces> is enabled, consecutive spaces are squashed to one space and leading and trailing spaces are removed.
+If I<squash-spaces> is enabled, consecutive spaces are squashed to one space and leading and trailing spaces are
+removed.
 
 Default: 0
 
@@ -955,7 +948,7 @@ Default: 2
 
 =head2 table-expand
 
-If the option I<table-expand> is enabled and C<Return> is pressed, the selected table row is printed with each column in
+If the option I<table-expand> is enabled and K<Return> is pressed, the selected table row is printed with each column in
 its own line. Exception: if the cursor auto-jumped to the first row, the first row will not be expanded.
 
 0 - off
@@ -979,13 +972,10 @@ its own line. Exception: if the cursor auto-jumped to the first row, the first r
 
 =end code
 
-If I<table-expand> is set to C<0>, the cursor jumps to the to first row (if not already there) when C<Return> is pressed.
+If I<table-expand> is set to C<0>, the cursor jumps to the to first row (if not already there) when K<Return> is
+pressed.
 
 Default: 1
-
-=head2 table-name
-
-If set (string), I<table_name> is added in the bottom line.
 
 =head2 undef
 

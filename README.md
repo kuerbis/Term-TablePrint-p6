@@ -38,7 +38,7 @@ If the table has more rows than the terminal, the table is divided up on as many
 
 If the terminal is too narrow to print the table, the columns are adjusted to the available width automatically.
 
-If the option table-expand is enabled and a row is selected with `Return`, each column of that row is output in its own line preceded by the column name. This might be useful if the columns were cut due to the too low terminal width.
+If the option table-expand is enabled and a row is selected with Return, each column of that row is output in its own line preceded by the column name. This might be useful if the columns were cut due to the too low terminal width.
 
 The following modifications are made (at a copy of the original data) to the table elements before the output.
 
@@ -60,23 +60,23 @@ KEYS
 
 Keys to move around:
 
-  * the `ArrowDown` key (or the `j` key) to move down and the `ArrowUp` key (or the `k` key) to move up.
+  * the ArrowDown key (or the j key) to move down and the ArrowUp key (or the k key) to move up.
 
-  * the `PageUp` key (or `Ctrl-B`) to go back one page, the `PageDown` key (or `Ctrl-F`) to go forward one page.
+  * the PageUp key (or Ctrl-P) to go to the previous page, the PageDown key (or Ctrl-N) to go to the next page.
 
-  * the `Insert` key to go back 10 pages, the `Delete` key to go forward 10 pages.
+  * the Insert key to go back 10 pages, the Delete key to go forward 10 pages.
 
-  * the `Home` key (or `Ctrl-A`) to jump to the first row of the table, the `End` key (or `Ctrl-E`) to jump to the last row of the table.
+  * the Home key (or Ctrl-A) to jump to the first row of the table, the End key (or Ctrl-E) to jump to the last row of the table.
 
-If *table-expand* is set to `0`, the `Return` key closes the table if the cursor is on the first row.
+If *table-expand* is set to `0`, the Return key closes the table if the cursor is on the first row.
 
-If *table-expand* is enabled and the cursor is on the first row, pressing `Return` three times in succession closes the table. If *table-expand* is set to `1` and the cursor is auto-jumped to the first row, it is required only one `Return` to close the table.
+If *table-expand* is enabled and the cursor is on the first row, pressing Return three times in succession closes the table. If *table-expand* is set to `1` and the cursor is auto-jumped to the first row, it is required only one Return to close the table.
 
 If the cursor is not on the first row:
 
-  * with the option *table-expand* disabled the cursor jumps to the table head if `Return` is pressed.
+  * with the option *table-expand* disabled the cursor jumps to the table head if Return is pressed.
 
-  * with the option *table-expand* enabled each column of the selected row is output in its own line preceded by the column name if `Return` is pressed. Another `Return` closes this output and goes back to the table output. If a row is selected twice in succession, the pointer jumps to the first row.
+  * with the option *table-expand* enabled each column of the selected row is output in its own line preceded by the column name if Return is pressed. Another Return closes this output and goes back to the table output. If a row is selected twice in succession, the pointer jumps to the first row.
 
 If the width of the window is changed and the option *table-expand* is enabled, the user can rewrite the screen by choosing a row.
 
@@ -129,6 +129,11 @@ Allowed values: a character with a print width of `1`. If an invalid values is p
 
 Default: . (dot)
 
+footer
+------
+
+If set (string), *footer* is added in the bottom line.
+
 max-rows
 --------
 
@@ -168,6 +173,17 @@ save-screen
 
 1 - use the alternate screen
 
+search
+------
+
+Set the behavior of Ctrl-F.
+
+0 - off
+
+1 - case-insensitive search (default)
+
+2 - case-sensitive search
+
 squash-spaces
 -------------
 
@@ -185,7 +201,7 @@ Default: 2
 table-expand
 ------------
 
-If the option *table-expand* is enabled and `Return` is pressed, the selected table row is printed with each column in its own line. Exception: if the cursor auto-jumped to the first row, the first row will not be expanded.
+If the option *table-expand* is enabled and Return is pressed, the selected table row is printed with each column in its own line. Exception: if the cursor auto-jumped to the first row, the first row will not be expanded.
 
 0 - off
 
@@ -204,14 +220,9 @@ If the option *table-expand* is enabled and `Return` is pressed, the selected ta
         |.... | ...... | .... | .... |        |                            |
         '----------------------------'        '----------------------------'
 
-If *table-expand* is set to `0`, the cursor jumps to the to first row (if not already there) when `Return` is pressed.
+If *table-expand* is set to `0`, the cursor jumps to the to first row (if not already there) when Return is pressed.
 
 Default: 1
-
-table-name
-----------
-
-If set (string), *table_name* is added in the bottom line.
 
 undef
 -----
