@@ -32,28 +32,7 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-`print-table` shows a table and lets the user interactively browse it. It provides a cursor which highlights the row on which it is located. The user can scroll through the table with the different cursor keys - see [KEYS](#KEYS).
-
-If the table has more rows than the terminal, the table is divided up on as many pages as needed automatically. If the cursor reaches the end of a page, the next page is shown automatically until the last page is reached. Also if the cursor reaches the topmost line, the previous page is shown automatically if it is not already the first one.
-
-If the terminal is too narrow to print the table, the columns are adjusted to the available width automatically.
-
-If the option table-expand is enabled and a row is selected with Return, each column of that row is output in its own line preceded by the column name. This might be useful if the columns were cut due to the too low terminal width.
-
-The following modifications are made (at a copy of the original data) to the table elements before the output.
-
-Tab characters (`\t`) are replaces with a space.
-
-Vertical spaces (`\v`) are squashed to two spaces
-
-Control characters, code points of the surrogate ranges and non-characters are removed.
-
-If the option *squash-spaces* is enabled leading and trailing spaces are removed from the array elements and spaces are squashed to a single space.
-
-If an element looks like a number it is left-justified, else it is right-justified.
-
-USAGE
-=====
+`print-table` shows a table and lets the user interactively browse it. It provides a cursor which highlights the row on which it is located. The user can scroll through the table with the different cursor keys.
 
 KEYS
 ----
@@ -70,7 +49,7 @@ Keys to move around:
 
 If *table-expand* is set to `0`, the Return key closes the table if the cursor is on the first row.
 
-If *table-expand* is enabled and the cursor is on the first row, pressing Return three times in succession closes the table. If *table-expand* is set to `1` and the cursor is auto-jumped to the first row, it is required only one Return to close the table.
+If *table-expand* is enabled and the cursor is on the first row, pressing Return three times in succession closes the table. If the cursor is auto-jumped to the first row, it is required only one Return to close the table.
 
 If the cursor is not on the first row:
 
@@ -78,7 +57,38 @@ If the cursor is not on the first row:
 
   * with the option *table-expand* enabled each column of the selected row is output in its own line preceded by the column name if Return is pressed. Another Return closes this output and goes back to the table output. If a row is selected twice in succession, the pointer jumps to the first row.
 
-If the width of the window is changed and the option *table-expand* is enabled, the user can rewrite the screen by choosing a row.
+If the size of the window has changed, the screen is rewritten as soon as the user presses a key.
+
+Ctrl-F opens a prompt. A regular expression is expected as input. This enables one to only display rows where at least one column matches the entered pattern. See option [/search](/search).
+
+Output
+------
+
+If the option table-expand is enabled and a row is selected with Return, each column of that row is output in its own line preceded by the column name.
+
+If the table has more rows than the terminal, the table is divided up on as many pages as needed automatically. If the cursor reaches the end of a page, the next page is shown automatically until the last page is reached. Also if the cursor reaches the topmost line, the previous page is shown automatically if it is not already the first page.
+
+For the output on the screen the table elements are modified. All the modifications are made on a copy of the original table data.
+
+  * If an element is not defined the value from the option *undef* is assigned to that element.
+
+  * Each character tabulation (`\t`) is replaces with a space.
+
+  * Vertical tabulations (`\v+`) are squashed to two spaces.
+
+  * Code points from the ranges of `control`, `surrogate` and `noncharacter` are removed.
+
+  * If the option *squash-spaces* is enabled leading and trailing spaces are removed and multiple consecutive spaces are squashed to a single space.
+
+  * If an element looks like a number it is left-justified, else it is right-justified.
+
+If the terminal is too narrow to print the table, the columns are adjusted to the available width automatically.
+
+  * First, if the option *trunc-fract-first* is enabled and if there are numbers that have a fraction, the fraction is truncated up to two decimal places.
+
+  * Then columns wider than *min-col-width* are trimmed. See option [/min-col-width](/min-col-width).
+
+  * If it is still required to lower the row width all columns are trimmed until they fit into the terminal.
 
 CONSTRUCTOR
 ===========
@@ -224,6 +234,11 @@ If *table-expand* is set to `0`, the cursor jumps to the to first row (if not al
 
 Default: 1
 
+trunc-fract-first
+-----------------
+
+If the terminal width is not wide enough and this option is enabled, the first step to reduce the width of the columns is to truncate the fraction part of numbers to 2 decimal places.
+
 undef
 -----
 
@@ -242,14 +257,16 @@ multithreading
 REQUIREMENTS
 ============
 
-tput
-----
+Escape sequences
+----------------
 
-The control of the cursor location, the highlighting of the cursor position and the marked elements and other options on the terminal is done via escape sequences.
+The control of the cursor location, the highlighting of the cursor position is done via escape sequences.
 
-`tput` is used to get the appropriate escape sequences.
+By default `Term::Choose` uses `tput` to get the appropriate escape sequences. If the environment variable `TC_ANSI_ESCAPES` is set to a true value, hardcoded ANSI escape sequences are used directly without calling `tput`.
 
-Escape sequences to handle mouse input are hardcoded.
+The escape sequences to enable the *mouse* mode are always hardcoded.
+
+If the environment variable `TERM` is not set to a true value, `vt100` is used instead as the terminal type for `tput`.
 
 Monospaced font
 ---------------
@@ -269,7 +286,7 @@ Matthäus Kiem <cuer2s@gmail.com>
 LICENSE AND COPYRIGHT
 =====================
 
-Copyright 2016-2021 Matthäus Kiem.
+Copyright 2016-2022 Matthäus Kiem.
 
 This library is free software; you can redistribute it and/or modify it under the Artistic License 2.0.
 

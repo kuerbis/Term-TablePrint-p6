@@ -1,6 +1,12 @@
 Revision history for Term::TablePrint
 
 
+1.5.9  2022-08-15
+        - Array cache to hash cache.
+        - New option 'trunc-fract-first'.
+        - Update format numbers.
+        - Update documentation.
+
 1.5.8  2021-08-17
         - Renamed the option 'f3' to 'search'.
         - Changed the search key from 'F3' to 'Ctrl-F'.

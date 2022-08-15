@@ -1,10 +1,10 @@
 use v6;
-unit class Term::TablePrint:ver<1.5.8>;
+unit class Term::TablePrint:ver<1.5.9>;
 
 use Term::Choose;
 use Term::Choose::LineFold;
 use Term::Choose::Screen;
-use Term::Choose::Util :insert-sep, :unicode-sprintf;
+use Term::Choose::Util :insert-sep;
 
 has %!o;
 
@@ -19,6 +19,7 @@ has Int_0_or_1 $.loop              = 0; # private
 has Int_0_or_1 $.mouse             = 0;
 has Int_0_or_1 $.save-screen       = 0;
 has Int_0_or_1 $.squash-spaces     = 0;
+has Int_0_or_1 $.trunc-fract-first = 1;
 has Int_0_to_2 $.color             = 0;
 has Int_0_to_2 $.search            = 1;
 has Int_0_to_2 $.table-expand      = 1;
@@ -31,9 +32,11 @@ has       @!tbl_orig;
 has       @!tbl_copy;
 has Int   @!w_heads;
 has       @!w_cols;
+has Int   @!w_cols_calc;
 has       @!w_int;
 has       @!w_fract;
-has Int   @!w_cols_calc;
+has Int   @!w_fract_calc;
+
 has Array @!portions;
 
 has Str $!filter_string = '';
@@ -84,6 +87,7 @@ method print-table (
         Int_0_or_1 :$mouse             = $!mouse,
         Int_0_or_1 :$save-screen       = $!save-screen,
         Int_0_or_1 :$squash-spaces     = $!squash-spaces,
+        Int_0_or_1 :$trunc-fract-first = $!trunc-fract-first,
         Int_0_to_2 :$color             = $!color,
         Int_0_to_2 :$search            = $!search,
         Int_0_to_2 :$table-expand      = $!table-expand,
@@ -93,7 +97,7 @@ method print-table (
         Str        :$undef             = $!undef,
     ) {
     %!o = :$max-rows, :$min-col-width, :$progress-bar, :$tab-width, :$mouse, :$save-screen, :$squash-spaces,
-          :$color, :$search, :$table-expand, :$decimal-separator, :$footer, :$prompt, :$undef;
+          :$color, :$search, :$table-expand, :$decimal-separator, :$footer, :$prompt, :$undef, :$trunc-fract-first;
     self!_init_term();
     if ! @!tbl_orig.elems {
         $!tc.pause( ( 'Close with ENTER', ), :prompt( '"print-table": Empty table!' ) );
@@ -284,7 +288,7 @@ method !_print_single_table_row ( Int $row, Str $footer, Int $search ) {
         }
         $col_name.=subst( / \t /,  ' ', :g );
         $col_name.=subst( / \v+ /,  '  ', :g );
-        $col_name.=subst( / <:Cc+:Noncharacter_Code_Point+:Cs> /, '', :g );
+        $col_name.=subst( / <:Cc+:Noncharacter_Code_Point+:Cs> /, '', :g ); ##
         my Str $key = to-printwidth( $col_name, $key_w, False ).[0];
         my $cell = @!tbl_orig[$row][$col] // $!undef;
         if %!o<color> {
@@ -325,7 +329,7 @@ method !_copy_table {
                     }
                     if %!o<color> { # elsif
                         $str.=subst( / \x[feff] /, '', :g );
-                        $str.=subst( / \e \[ <[\d;]>* m /, "\x[feff]", :g ); # msg
+                        $str.=subst( / \e \[ <[\d;]>* m /, "\x[feff]", :g );
                     }
                     if %!o<squash-spaces> {
                         $str.=subst( / ^ <:Space>+ /, '', :g );
@@ -334,7 +338,7 @@ method !_copy_table {
                     }
                     $str.=subst( / \t /,  ' ', :g );
                     $str.=subst( / \v+ /,  '  ', :g );
-                    $str.=subst( / <:Cc+:Noncharacter_Code_Point+:Cs> /, '', :g );
+                    $str.=subst( / <:Cc+:Noncharacter_Code_Point+:Cs> /, '', :g ); ##
                     $str;
                 }
             }
@@ -369,7 +373,7 @@ method !_calc_col_width {
     my Promise @promise;
     my Lock $lock = Lock.new();
     for @!portions -> $range {
-        my @cache;
+        my Int %cache;
         @promise.push: start {
             for |$range -> $row {
                 if $step {                                       #
@@ -382,10 +386,7 @@ method !_calc_col_width {
                 }                                                #
                 for @idx_cols -> $col {
                     if @!tbl_copy.AT-POS($row).AT-POS($col).chars {
-                        if @!tbl_copy.AT-POS($row).AT-POS($col) ~~ / ^ ( <[-+]>? <[0..9]>* ) ( $ds <[0..9]>+ )? $ / {
-                            if @!tbl_copy.AT-POS($row).AT-POS($col).chars > @w_cols.AT-POS($col) {
-                                @w_cols.BIND-POS( $col, @!tbl_copy.AT-POS($row).AT-POS($col).chars );
-                            }
+                        if @!tbl_copy.AT-POS($row).AT-POS($col) ~~ / ^ ( <[-+]>? <[0..9]>+ )? ( $ds <[0..9]>+ )? $ / {
                             if $0.defined && $0.chars > @w_int.AT-POS($col) {
                                 @w_int.BIND-POS( $col, $0.chars );
                             }
@@ -394,7 +395,7 @@ method !_calc_col_width {
                             }
                         }
                         else {
-                            my $width = print-columns( @!tbl_copy.AT-POS($row).AT-POS($col), @cache );
+                            my $width = print-columns( @!tbl_copy.AT-POS($row).AT-POS($col), %cache );
                             if $width > @w_cols.AT-POS($col) {
                                 @w_cols.BIND-POS( $col, $width );
                             }
@@ -406,6 +407,11 @@ method !_calc_col_width {
     }
     await @promise;
     @!portions[0].unshift: $header_idx;
+    for @idx_cols -> $col {
+        if @w_int.AT-POS($col) + @w_fract.AT-POS($col) > @w_cols.AT-POS($col) {
+            @w_cols.BIND-POS( $col, @w_int.AT-POS($col) + @w_fract.AT-POS($col) );
+        }
+    }
     @!w_cols  := @w_cols;
     @!w_int   := @w_int;
     @!w_fract := @w_fract;
@@ -417,6 +423,7 @@ method !_calc_col_width {
 
 method !_calc_avail_col_width( $term_w ) {
     @!w_cols_calc = @!w_cols;
+    @!w_fract_calc = @!w_fract;
     my Int $avail_w = $term_w - $!tab_w * @!w_cols_calc.end;
     my Int $sum = [+] @!w_cols_calc;
     if $sum < $avail_w {
@@ -434,50 +441,80 @@ method !_calc_avail_col_width( $term_w ) {
         }
     }
     elsif $sum > $avail_w {
-        my Int $mininum_w = %!o<min-col-width> || 1;
-        if @!w_heads.elems > $avail_w {
+
+        if @!w_heads.elems > $avail_w { ##
             self!_print_term_not_wide_enough_message();
             return;
         }
-        my Int @w_cols_tmp = @!w_cols_calc;
-        my Int $percent = 0;
+        if %!o<trunc-fract-first> {
 
-        MIN: while $sum > $avail_w {
-            ++$percent;
-            my Int $count = 0;
-            for ^@w_cols_tmp -> $i {
-                if $mininum_w >= @w_cols_tmp.AT-POS($i) {
-                    next;
-                }
-                if $mininum_w >= _minus_x_percent( @w_cols_tmp.AT-POS($i), $percent ) {
-                    @w_cols_tmp[$i] = $mininum_w;
-                }
-                else {
-                    @w_cols_tmp[$i] = _minus_x_percent( @w_cols_tmp[$i], $percent );
-                }
-                ++$count;
-            }
-            $sum = @w_cols_tmp.sum;
-            $mininum_w-- if $count == 0;
-            #last MIN if $mininum_w == 0;
-        }
-        my Int $rest = $avail_w - $sum;
-        if $rest {
-
-            REST: loop {
-                my Int $count = 0;
-                for ^@w_cols_tmp -> $i {
-                    if @w_cols_tmp.AT-POS($i) < @!w_cols_calc.AT-POS($i) {
-                        @w_cols_tmp.BIND-POS( $i, @w_cols_tmp.AT-POS($i) + 1 );
-                        $rest--;
-                        $count++;
-                        last REST if $rest == 0;
+            TRUNC_FRACT: while $sum > $avail_w {
+                my Int $prev_sum = $sum;
+                for ^@!w_cols_calc -> $col {
+                    if @!w_fract_calc.AT-POS($col) && @!w_fract_calc.AT-POS($col) > 3 {
+                       # 3 == 1 decimal separator + 2 decimal places
+                        --@!w_fract_calc.AT-POS($col);
+                        --@!w_cols_calc.AT-POS($col);
+                        --$sum;
+                        if $sum == $avail_w {
+                            last TRUNC_FRACT;
+                        }
                     }
                 }
-                last REST if $count == 0;
+                if $sum == $prev_sum {
+                    last TRUNC_FRACT;
+                }
             }
         }
-        @!w_cols_calc = [ @w_cols_tmp ] if @w_cols_tmp.elems;
+        my Int $min_col_w = %!o<min-col-width> < 2 ?? 2 !! %!o<min-col-width>;
+        my Int $percent = 0;
+
+        TRUNC_COLS: while $sum > $avail_w {
+            ++$percent;
+            for ^@!w_cols_calc -> $col {
+                if @!w_cols_calc.AT-POS($col) > $min_col_w {
+                    my Int $reduced_col_w = _minus_x_percent( @!w_cols_calc.AT-POS($col), $percent );
+                    if $reduced_col_w < $min_col_w {
+                        $reduced_col_w = $min_col_w;
+                    }
+                    if @!w_fract_calc.AT-POS($col) > 2 {
+                        @!w_fract_calc.BIND-POS( $col, @!w_fract_calc.AT-POS($col) - @!w_cols_calc.AT-POS($col) - $reduced_col_w );
+                        if @!w_fract_calc.AT-POS($col) < 2 {
+                            @!w_fract_calc.BIND-POS( $col, 2 );
+                        }
+                    }
+                    @!w_cols_calc.BIND-POS( $col, $reduced_col_w );
+                }
+            }
+            my Int $prev_sum = $sum;
+            $sum = @!w_cols_calc.sum;
+            if $sum == $prev_sum {
+                --$min_col_w;
+                if $min_col_w < 2 { # a character could have a print width of 2
+                    self!_print_term_not_wide_enough_message();
+                    return;
+                }
+            }
+        }
+        my Int $remainder_w = $avail_w - $sum;
+        if $remainder_w {
+
+            REMAINDER_W: loop {
+                my Int $prev_remainder_w = $remainder_w;
+                for ^@!w_cols_calc -> $col {
+                    if @!w_cols_calc.AT-POS($col) < @!w_cols.AT-POS($col) {
+                        @!w_cols_calc.BIND-POS( $col, @!w_cols_calc.AT-POS($col) + 1 );
+                        --$remainder_w;
+                        if $remainder_w == 0 {
+                            last REMAINDER_W;
+                        }
+                    }
+                }
+                if $remainder_w == $prev_remainder_w {
+                    last REMAINDER_W;
+                }
+            }
+        }
     }
     return 1;
 }
@@ -488,10 +525,11 @@ method !_table_row_to_string {
     my Str $tab = ( ' ' x $!tab_w div 2 ) ~ '|' ~ ( ' ' x $!tab_w div 2 );
     my ( Int $count, Int $step ) = self!_set_progress_bar;       #
     my Str $ds = %!o<decimal-separator>;
+    my Int $one_precision_w = sprintf( "%.1e", 123 ).chars;
     my Promise @promise;
     my Lock $lock = Lock.new();
     for @!portions -> $range {
-        my @cache;
+        my Int %cache;
         @promise.push: start {
             do for |$range -> $row {
                 my Str $str = '';
@@ -499,38 +537,71 @@ method !_table_row_to_string {
                     if ! @!tbl_copy.AT-POS($row).AT-POS($col).chars {
                             $str = $str ~ ' ' x @!w_cols_calc.AT-POS($col);
                     }
-                    elsif @!tbl_copy.AT-POS($row).AT-POS($col) ~~ / ^ ( <[-+]>? <[0..9]>* ) ( $ds <[0..9]>+ )? $ / {
-                        my Str $all = '';
-                        if @!w_fract.AT-POS($col) {
+                    elsif @!tbl_copy.AT-POS($row).AT-POS($col) ~~ / ^ ( <[-+]>? <[0..9]>+ )? ( $ds <[0..9]>+ )? $ / {
+                        my Str $fract = '';
+                        if @!w_fract_calc.AT-POS($col) {
                             if $1.defined {
-                                if $1.chars > @!w_fract.AT-POS($col) {
-                                    $all = $1.substr( 0, @!w_fract.AT-POS($col) );
+                                if $1.chars > @!w_fract_calc.AT-POS($col) {
+                                    $fract = $1.substr( 0, @!w_fract_calc.AT-POS($col) );
                                 }
                                 else {
-                                    $all = $1 ~ ( ' ' x ( @!w_fract.AT-POS($col) - $1.chars ) );
+                                    $fract = $1 ~ ( ' ' x ( @!w_fract_calc.AT-POS($col) - $1.chars ) );
                                 }
                             }
                             else {
-                                $all = ' ' x @!w_fract.AT-POS($col);
+                                $fract = ' ' x @!w_fract_calc.AT-POS($col);
                             }
                         }
+                        my Str $number;
                         if $0.defined {
                             if @!w_int.AT-POS($col) > $0.chars {
-                                $all = ' ' x ( @!w_int.AT-POS($col) - $0.chars ) ~ $0 ~ $all;
+                                $number = ' ' x ( @!w_int.AT-POS($col) - $0.chars ) ~ $0 ~ $fract;
                             }
                             else {
-                                $all = $0 ~ $all;
+                                $number = $0 ~ $fract;
                             }
                         }
-                        if $all.chars > @!w_cols_calc.AT-POS($col) {
-                            $str = $str ~ $all.substr( 0, @!w_cols_calc.AT-POS($col) );
+                        if $number.chars > @!w_cols_calc.AT-POS($col) {
+                            my Int $signed_1_precision_w = $one_precision_w + ( $number.starts-with( '-' ) ?? 1 !! 0 );
+                            my Int $precision;
+                            if @!w_cols_calc.AT-POS($col) < $signed_1_precision_w {
+                                # special treatment because zero precision has no dot
+                                $precision = 0;
+                            }
+                            else {
+                                $precision = @!w_cols_calc.AT-POS($col) - ( $signed_1_precision_w - 1 );
+                            }
+                            $number = sprintf "%.*e", $precision, $number;
+                            if $number.chars > @!w_cols_calc.AT-POS($col) {
+                                $str = $str ~ ( '-' x @!w_cols_calc.AT-POS($col) );
+                            }
+                            elsif $number.chars < @!w_cols_calc.AT-POS($col) {
+                                # @!w_cols_calc.AT-POS($col) == zero_precision_w + 1
+                                #$str = $str ~ ' ' ~ $number;
+                                $str = $str ~ $number ~ ' ';
+                            }
+                            else {
+                                $str = $str ~ $number;
+                            }
+                        }
+                        elsif $number.chars < @!w_cols_calc.AT-POS($col) {
+                            $str = $str ~ ' ' x ( @!w_cols_calc.AT-POS($col) - $number.chars ) ~ $number;
                         }
                         else {
-                            $str = $str ~ ' ' x ( @!w_cols_calc.AT-POS($col) - $all.chars ) ~ $all;
+                            $str = $str ~ $number;
                         }
                     }
                     else {
-                        $str = $str ~ unicode-sprintf( @!tbl_copy.AT-POS($row).AT-POS($col), @!w_cols_calc.AT-POS($col), @cache );
+                        my Int $width = print-columns( @!tbl_copy.AT-POS($row).AT-POS($col), %cache );
+                        if $width > @!w_cols_calc.AT-POS($col) {
+                            $str = $str ~ to-printwidth( @!tbl_copy.AT-POS($row).AT-POS($col), @!w_cols_calc.AT-POS($col), False, %cache ).[0];
+                        }
+                        elsif $width < @!w_cols_calc.AT-POS($col) {
+                            $str =  $str ~ @!tbl_copy.AT-POS($row).AT-POS($col) ~ ' ' x ( @!w_cols_calc.AT-POS($col) - $width );
+                        }
+                        else {
+                            $str = $str ~ @!tbl_copy.AT-POS($row).AT-POS($col);
+                        }
                     }
                     if %!o<color> && @!tbl_orig.AT-POS($row).AT-POS($col).defined { #
                         my Str @colors = @!tbl_orig.AT-POS($row).AT-POS($col).comb( / \e \[ <[\d;]>* m / );
@@ -779,31 +850,7 @@ Term::TablePrint - Print a table to the terminal and browse it interactively.
 =head1 DESCRIPTION
 
 C<print-table> shows a table and lets the user interactively browse it. It provides a cursor which highlights the row
-on which it is located. The user can scroll through the table with the different cursor keys - see L<#KEYS>.
-
-If the table has more rows than the terminal, the table is divided up on as many pages as needed automatically. If the
-cursor reaches the end of a page, the next page is shown automatically until the last page is reached. Also if the
-cursor reaches the topmost line, the previous page is shown automatically if it is not already the first one.
-
-If the terminal is too narrow to print the table, the columns are adjusted to the available width automatically.
-
-If the option table-expand is enabled and a row is selected with K<Return>, each column of that row is output in its own
-line preceded by the column name. This might be useful if the columns were cut due to the too low terminal width.
-
-The following modifications are made (at a copy of the original data) to the table elements before the output.
-
-Tab characters (C<\t>) are replaces with a space.
-
-Vertical spaces (C<\v>) are squashed to two spaces
-
-Control characters, code points of the surrogate ranges and non-characters are removed.
-
-If the option I<squash-spaces> is enabled leading and trailing spaces are removed from the array elements and spaces are
-squashed to a single space.
-
-If an element looks like a number it is left-justified, else it is right-justified.
-
-=head1 USAGE
+on which it is located. The user can scroll through the table with the different cursor keys.
 
 =head2 KEYS
 
@@ -822,8 +869,7 @@ last row of the table.
 If I<table-expand> is set to C<0>, the K<Return> key closes the table if the cursor is on the first row.
 
 If I<table-expand> is enabled and the cursor is on the first row, pressing K<Return> three times in succession closes
-the table. If I<table-expand> is set to C<1> and the cursor is auto-jumped to the first row, it is required only one
-K<Return> to close the table.
+the table. If the cursor is auto-jumped to the first row, it is required only one K<Return> to close the table.
 
 If the cursor is not on the first row:
 
@@ -833,8 +879,44 @@ If the cursor is not on the first row:
 column name if K<Return> is pressed. Another K<Return> closes this output and goes back to the table output. If a row is
 selected twice in succession, the pointer jumps to the first row.
 
-If the width of the window is changed and the option I<table-expand> is enabled, the user can rewrite the screen by
-choosing a row.
+If the size of the window has changed, the screen is rewritten as soon as the user presses a key.
+
+K<Ctrl-F> opens a prompt. A regular expression is expected as input. This enables one to only display rows where at
+least one column matches the entered pattern. See option L</search>.
+
+=head2 Output
+
+If the option table-expand is enabled and a row is selected with K<Return>, each column of that row is output in its own
+line preceded by the column name.
+
+If the table has more rows than the terminal, the table is divided up on as many pages as needed automatically. If the
+cursor reaches the end of a page, the next page is shown automatically until the last page is reached. Also if the
+cursor reaches the topmost line, the previous page is shown automatically if it is not already the first page.
+
+For the output on the screen the table elements are modified. All the modifications are made on a copy of the original
+table data.
+
+=item If an element is not defined the value from the option I<undef> is assigned to that element.
+
+=item Each character tabulation (C<\t>) is replaces with a space.
+
+=item Vertical tabulations (C<\v+>) are squashed to two spaces.
+
+=item Code points from the ranges of C<control>, C<surrogate> and C<noncharacter> are removed.
+
+=item If the option I<squash-spaces> is enabled leading and trailing spaces are removed and multiple consecutive spaces are
+squashed to a single space.
+
+=item If an element looks like a number it is left-justified, else it is right-justified.
+
+If the terminal is too narrow to print the table, the columns are adjusted to the available width automatically.
+
+=item First, if the option I<trunc-fract-first> is enabled and if there are numbers that have a fraction, the fraction is
+truncated up to two decimal places.
+
+=item Then columns wider than I<min-col-width> are trimmed. See option L</min-col-width>.
+
+=item If it is still required to lower the row width all columns are trimmed until they fit into the terminal.
 
 =head1 CONSTRUCTOR
 
@@ -977,6 +1059,11 @@ pressed.
 
 Default: 1
 
+=head2 trunc-fract-first
+
+If the terminal width is not wide enough and this option is enabled, the first step to reduce the width of the columns
+is to truncate the fraction part of numbers to 2 decimal places.
+
 =head2 undef
 
 Set the string that will be shown on the screen instead of an undefined field.
@@ -992,14 +1079,17 @@ with the environment variable C<TC_NUM_THREADS>.
 
 =head1 REQUIREMENTS
 
-=head2 tput
+=head2 Escape sequences
 
-The control of the cursor location, the highlighting of the cursor position and the marked elements and other options on
-the terminal is done via escape sequences.
+The control of the cursor location, the highlighting of the cursor position is done via escape sequences.
 
-C<tput> is used to get the appropriate escape sequences.
+By default C<Term::Choose> uses C<tput> to get the appropriate escape sequences. If the environment variable
+C<TC_ANSI_ESCAPES> is set to a true value, hardcoded ANSI escape sequences are used directly without calling C<tput>.
 
-Escape sequences to handle mouse input are hardcoded.
+The escape sequences to enable the I<mouse> mode are always hardcoded.
+
+If the environment variable C<TERM> is not set to a true value, C<vt100> is used instead as the terminal type for
+C<tput>.
 
 =head2 Monospaced font
 
@@ -1017,7 +1107,7 @@ Matthäus Kiem <cuer2s@gmail.com>
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright 2016-2021 Matthäus Kiem.
+Copyright 2016-2022 Matthäus Kiem.
 
 This library is free software; you can redistribute it and/or modify it under the Artistic License 2.0.
 
