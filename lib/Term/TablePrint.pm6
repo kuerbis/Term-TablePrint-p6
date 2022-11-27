@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.5.9>;
+unit class Term::TablePrint:ver<1.6.0>;
 
 use Term::Choose;
 use Term::Choose::LineFold;
@@ -279,7 +279,7 @@ method !_print_single_table_row ( Int $row, Str $footer, Int $search ) {
     my Int $col_w = $term_w - ( $key_w + $sep_w + 1 ); #
     my Str @lines = ' Close with ENTER', ' ';
     for ^@!tbl_orig[0] -> $col {
-        my Str $col_name = ( @!tbl_orig[0][$col] // %!o<undef> );
+        my $col_name = ( @!tbl_orig[0][$col] // %!o<undef> );
         if $col_name ~~ Buf {
             $col_name = $col_name.gist;
         }
@@ -288,7 +288,7 @@ method !_print_single_table_row ( Int $row, Str $footer, Int $search ) {
         }
         $col_name.=subst( / \t /,  ' ', :g );
         $col_name.=subst( / \v+ /,  '  ', :g );
-        $col_name.=subst( / <:Cc+:Noncharacter_Code_Point+:Cs> /, '', :g ); ##
+        $col_name.=subst( / <:Cc+:Noncharacter_Code_Point+:Cs> /, '', :g );
         my Str $key = to-printwidth( $col_name, $key_w, False ).[0];
         my $cell = @!tbl_orig[$row][$col] // $!undef;
         if %!o<color> {
@@ -368,13 +368,14 @@ method !_calc_col_width {
     my Int @w_cols[$size]  = ( 1 xx $size );
     my Int @w_int[$size]   = ( 0 xx $size );
     my Int @w_fract[$size] = ( 0 xx $size );
-    my Int $header_idx = @!portions[0].shift; # already done: w_heads 
+    my Int $header_idx = @!portions[0].shift; # already done: w_heads
     my Str $ds = %!o<decimal-separator>;
     my Promise @promise;
     my Lock $lock = Lock.new();
     for @!portions -> $range {
-        my Int %cache;
+        #my Int %cache;
         @promise.push: start {
+            my Int %cache;
             for |$range -> $row {
                 if $step {                                       #
                     $lock.protect( {                             #
@@ -529,37 +530,49 @@ method !_table_row_to_string {
     my Promise @promise;
     my Lock $lock = Lock.new();
     for @!portions -> $range {
-        my Int %cache;
+        #my Int %cache;
         @promise.push: start {
+            my Int %cache;
             do for |$range -> $row {
                 my Str $str = '';
                 for @idx_cols -> $col {
                     if ! @!tbl_copy.AT-POS($row).AT-POS($col).chars {
                             $str = $str ~ ' ' x @!w_cols_calc.AT-POS($col);
                     }
-                    elsif @!tbl_copy.AT-POS($row).AT-POS($col) ~~ / ^ ( <[-+]>? <[0..9]>+ )? ( $ds <[0..9]>+ )? $ / {
-                        my Str $fract = '';
-                        if @!w_fract_calc.AT-POS($col) {
-                            if $1.defined {
-                                if $1.chars > @!w_fract_calc.AT-POS($col) {
-                                    $fract = $1.substr( 0, @!w_fract_calc.AT-POS($col) );
-                                }
-                                else {
-                                    $fract = $1 ~ ( ' ' x ( @!w_fract_calc.AT-POS($col) - $1.chars ) );
+                    elsif @!tbl_copy.AT-POS($row).AT-POS($col) ~~ / ^ ( <[-+]>? <[0..9]>+ )? ( $ds <[0..9]>+ )? ( <[eE]> <[-+]>? <[0..9]>+ )? $ / {
+                        my Str $number;
+                        if $2 {
+                            if $0 || $1 {
+                                $number = @!tbl_copy.AT-POS($row).AT-POS($col);
+                                if $2.starts-with( 'E' ) {
+                                    $number ~~ s/E/e/;
                                 }
                             }
                             else {
-                                $fract = ' ' x @!w_fract_calc.AT-POS($col);
+                                # not a number
+                                $number = sprintf "%-*.*s", @!w_cols_calc.AT-POS($col), @!w_cols_calc.AT-POS($col), @!tbl_copy.AT-POS($row).AT-POS($col);
                             }
                         }
-                        my Str $number;
-                        if $0.defined {
-                            if @!w_int.AT-POS($col) > $0.chars {
-                                $number = ' ' x ( @!w_int.AT-POS($col) - $0.chars ) ~ $0 ~ $fract;
+                        else {
+                            # all $fract's of a column must have the same length
+                            my Str $fract = ''; 
+                            if @!w_fract_calc.AT-POS($col) {
+                                if $1.defined {
+                                    if $1.chars > @!w_fract_calc.AT-POS($col) {
+                                        $fract = $1.substr( 0, @!w_fract_calc.AT-POS($col) );
+                                    }
+                                    elsif $1.chars < @!w_fract_calc.AT-POS($col) {
+                                        $fract = $1 ~ ( ' ' x ( @!w_fract_calc.AT-POS($col) - $1.chars ) );
+                                    }
+                                    else {
+                                        $fract = $1.Str;
+                                    }
+                                }
+                                else {
+                                    $fract = ' ' x @!w_fract_calc.AT-POS($col);
+                                }
                             }
-                            else {
-                                $number = $0 ~ $fract;
-                            }
+                            $number = $0.defined ?? $0 ~ $fract !! $fract;
                         }
                         if $number.chars > @!w_cols_calc.AT-POS($col) {
                             my Int $signed_1_precision_w = $one_precision_w + ( $number.starts-with( '-' ) ?? 1 !! 0 );
@@ -569,14 +582,13 @@ method !_table_row_to_string {
                                 $precision = 0;
                             }
                             else {
-                                $precision = @!w_cols_calc.AT-POS($col) - ( $signed_1_precision_w - 1 );
+                                $precision = @!w_cols_calc.AT-POS($col) - ( $signed_1_precision_w - 1 ); # -1 for the dot
                             }
                             $number = sprintf "%.*e", $precision, $number;
-                            if $number.chars > @!w_cols_calc.AT-POS($col) {
+                            if $number.chars > @!w_cols_calc.AT-POS($col) { # not enough space to print the number
                                 $str = $str ~ ( '-' x @!w_cols_calc.AT-POS($col) );
                             }
-                            elsif $number.chars < @!w_cols_calc.AT-POS($col) {
-                                # @!w_cols_calc.AT-POS($col) == zero_precision_w + 1
+                            elsif $number.chars < @!w_cols_calc.AT-POS($col) { # @!w_cols_calc.AT-POS($col) == zero_precision_w + 1
                                 #$str = $str ~ ' ' ~ $number;
                                 $str = $str ~ $number ~ ' ';
                             }
@@ -710,12 +722,11 @@ method !_row_count ( $orig_row_count ) {
 
 method !_split_work_for_threads {
     my Int $threads = num-threads();
-    while $threads * 2 > $!row_count {
-        last if $threads == 1;
-        $threads = $threads div 2;
+    if $threads > $!row_count {
+        $threads = $!row_count;
     }
     my Int $size = $!row_count div $threads;
-    if ( $!row_count % $threads ) {
+    if $!row_count % $threads {
         $size++;
     }
     my Int @idx_rows = 0 .. $!row_count - 1;
@@ -804,8 +815,7 @@ method !_print_term_not_wide_enough_message {
 
 
 sub _minus_x_percent ( Int $value, Int $percent ) {
-    my Int $new = ( $value - ( $value / 100 * $percent ) ).Int;
-    return $new > 0 ?? $new !! 1; ##
+    ( $value - ( $value / 100 * $percent ) ).Int || 1;
 }
 
 

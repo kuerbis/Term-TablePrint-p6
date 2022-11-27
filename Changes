@@ -1,6 +1,11 @@
 Revision history for Term::TablePrint
 
 
+1.6.0  2022-11-27
+        - Format scientific notation as number.
+        - Don't share cache between threads.
+        - Print-single-table-row: don't restrict col-name datatype to Str.
+
 1.5.9  2022-08-15
         - Array cache to hash cache.
         - New option 'trunc-fract-first'.
