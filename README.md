@@ -12,10 +12,10 @@ SYNOPSIS
 
 
         my @table = ( [ 'id', 'name' ],
-                      [    1, 'Ruth' ],
-                      [    2, 'John' ],
-                      [    3, 'Mark' ],
-                      [    4, 'Nena' ], );
+                      [    1, 'banana' ],
+                      [    2, 'apple' ],
+                      [    3, 'orange' ],
+                      [    4, 'mango' ], );
 
 
         # Functional style:
@@ -80,7 +80,7 @@ For the output on the screen the table elements are modified. All the modificati
 
   * If the option *squash-spaces* is enabled leading and trailing spaces are removed and multiple consecutive spaces are squashed to a single space.
 
-  * If an element looks like a number it is left-justified, else it is right-justified.
+  * If an element looks like a number it is right-justified, else it is left-justified.
 
 If the terminal is too narrow to print the table, the columns are adjusted to the available width automatically.
 
@@ -122,7 +122,7 @@ String displayed above the table.
 color
 -----
 
-If this option is enabled, SRG ANSI escape sequences can be used to color the screen output.
+If this option is enabled, SRG ANSI escape sequences can be used to color the screen output. Colors are reset to normal after each table cell.
 
 0 - off (default)
 
@@ -286,7 +286,7 @@ Matthäus Kiem <cuer2s@gmail.com>
 LICENSE AND COPYRIGHT
 =====================
 
-Copyright 2016-2022 Matthäus Kiem.
+Copyright 2016-2023 Matthäus Kiem.
 
 This library is free software; you can redistribute it and/or modify it under the Artistic License 2.0.
 

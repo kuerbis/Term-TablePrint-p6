@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.6.0>;
+unit class Term::TablePrint:ver<1.6.1>;
 
 use Term::Choose;
 use Term::Choose::LineFold;
@@ -11,7 +11,7 @@ has %!o;
 subset Int_0_to_2 of Int where * == 0|1|2;
 subset Int_0_or_1 of Int where * == 0|1;
 
-has UInt       $.max-rows          = 50_000;
+has UInt       $.max-rows          = 0;
 has UInt       $.min-col-width     = 30;
 has UInt       $.progress-bar      = 5_000;
 has UInt       $.tab-width         = 2;
@@ -20,6 +20,7 @@ has Int_0_or_1 $.mouse             = 0;
 has Int_0_or_1 $.save-screen       = 0;
 has Int_0_or_1 $.squash-spaces     = 0;
 has Int_0_or_1 $.trunc-fract-first = 1;
+has Int_0_to_2 $.binary-filter     = 0;
 has Int_0_to_2 $.color             = 0;
 has Int_0_to_2 $.search            = 1;
 has Int_0_to_2 $.table-expand      = 1;
@@ -45,6 +46,7 @@ has     %!map_return_wr_table = :0last, :1window_width_changed, :2enter_search_s
 
 has Int  $!row_count;
 has Int  $!tab_w;
+has Str $!binary-string = 'BNRY';
 has Str  $!info_row;
 has Str  $!thsd_sep = ',';
 has Hash $!p_bar;
@@ -88,6 +90,7 @@ method print-table (
         Int_0_or_1 :$save-screen       = $!save-screen,
         Int_0_or_1 :$squash-spaces     = $!squash-spaces,
         Int_0_or_1 :$trunc-fract-first = $!trunc-fract-first,
+        Int_0_to_2 :$binary-filter     = $!binary-filter;
         Int_0_to_2 :$color             = $!color,
         Int_0_to_2 :$search            = $!search,
         Int_0_to_2 :$table-expand      = $!table-expand,
@@ -96,7 +99,7 @@ method print-table (
         Str        :$prompt            = $!prompt,
         Str        :$undef             = $!undef,
     ) {
-    %!o = :$max-rows, :$min-col-width, :$progress-bar, :$tab-width, :$mouse, :$save-screen, :$squash-spaces,
+    %!o = :$max-rows, :$min-col-width, :$progress-bar, :$tab-width, :$mouse, :$save-screen, :$squash-spaces, :$binary-filter,
           :$color, :$search, :$table-expand, :$decimal-separator, :$footer, :$prompt, :$undef, :$trunc-fract-first;
     self!_init_term();
     if ! @!tbl_orig.elems {
@@ -270,40 +273,67 @@ method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header 
 
 method !_print_single_table_row ( Int $row, Str $footer, Int $search ) {
     my Int $term_w = get-term-size().[0] + 1;
-    my Int $key_w = @!w_heads.max + 1; #
-    if $key_w > $term_w div 100 * 33 {
-        $key_w = $term_w div 100 * 33;
+    my Int $max_key_w = @!w_heads.max + 1; #
+    if $max_key_w > $term_w div 3 {
+        $max_key_w = $term_w div 3;
     }
     my Str $separator = ' : ';
     my Int $sep_w = $separator.chars;
-    my Int $col_w = $term_w - ( $key_w + $sep_w + 1 ); #
+    my Int $max_value_w = $term_w - ( $max_key_w + $sep_w + 1 ); #
     my Str @lines = ' Close with ENTER', ' ';
+
     for ^@!tbl_orig[0] -> $col {
-        my $col_name = ( @!tbl_orig[0][$col] // %!o<undef> );
-        if $col_name ~~ Buf {
-            $col_name = $col_name.gist;
+        my $key = ( @!tbl_orig[0][$col] // %!o<undef> );
+        if $key ~~ Buf {
+            $key = $key.gist;
         }
         if %!o<color> { # elsif
-            $col_name.=subst( / \e \[ <[\d;]>* m /, '', :g );
+            $key.=subst( / \x[feff] /, '', :g );
+            $key.=subst( / \e \[ <[\d;]>* m /, "\x[feff]", :g );
         }
-        $col_name.=subst( / \t /,  ' ', :g );
-        $col_name.=subst( / \v+ /,  '  ', :g );
-        $col_name.=subst( / <:Cc+:Noncharacter_Code_Point+:Cs> /, '', :g );
-        my Str $key = to-printwidth( $col_name, $key_w, False ).[0];
-        my $cell = @!tbl_orig[$row][$col] // $!undef;
+        if %!o<binary-filter> && $key.substr( 0, 100 ).match: /<[\x00..\x08\x0B..\x0C\x0E..\x1F]>/ {
+            if %!o<binary-filter> == 2 {
+                $key = ( @!tbl_orig[0][$col] // %!o<undef> ).encode>>.fmt('%02X').Str;
+            }
+            else {
+                $key = $!binary-string;
+            }
+        }
+        $key.=subst( / \t /,  ' ', :g );
+        $key.=subst( / \v+ /,  '  ', :g );
+        $key.=subst( / <:Cc+:Noncharacter_Code_Point+:Cs> /, '', :g );
+        my Int $key_w = print-columns( $key );
+        if $key_w > $max_key_w {
+            $key = to-printwidth( $key, $max_key_w );
+        }
+        elsif $key_w < $max_key_w { # >
+            $key = ( ' ' x ( $max_key_w - $key_w ) ) ~ $key;
+        }
         if %!o<color> {
-            $cell.=subst( / \e \[ <[\d;]>* m /, '', :g );
+            my Str @colors = @!tbl_orig[0][$col].comb( / \e \[ <[\d;]>* m / );
+            if @colors.elems {
+                $key.=subst( / \x[feff] /, { @colors.shift }, :g );
+                if @colors.elems {
+                    $key ~= @colors[*-1];
+                }
+            }
         }
-        my Str $sep = $separator;
-        for line-fold( $cell, $col_w ) -> $line { # color ?
-            @lines.push: sprintf "%*.*s%*s%s", $key_w xx 2, $key, $sep_w, $sep, $line;
-            $key = '' if $key;
-            $sep = '' if $sep;
+        my $value = @!tbl_orig[$row][$col] // $!undef;
+        my Str $subseq_tab = ' ' x ( $max_key_w + $sep_w );
+        my Int $count = 0;
+
+        for line-fold( $value, $max_value_w, :color( %!o<color> ), :binary-filter( %!o<binary-filter> ) ) -> $line {
+            if ! $count++ {
+                @lines.push: $key ~ $separator ~ $line;
+            }
+            else {
+                @lines.push: $subseq_tab ~ $line;
+            }
         }
         @lines.push: ' ';
     }
     @lines.pop;
-    $!tc.pause( @lines, :prompt( '' ), :2layout, :$footer, :$search );
+    $!tc.pause( @lines, :prompt( '' ), :2layout, :$footer, :$search, :color( %!o<color> ) );
 }
 
 
@@ -330,6 +360,14 @@ method !_copy_table {
                     if %!o<color> { # elsif
                         $str.=subst( / \x[feff] /, '', :g );
                         $str.=subst( / \e \[ <[\d;]>* m /, "\x[feff]", :g );
+                    }
+                    if %!o<binary-filter> && $str.substr( 0, 100 ).match: /<[\x00..\x08\x0B..\x0C\x0E..\x1F]>/ {
+                        if %!o<binary-filter> == 2 {
+                            $str = ( @!tbl_orig.AT-POS($row).AT-POS($col) // %!o<undef> ).encode>>.fmt('%02X').Str;
+                        }
+                        else {
+                            $str = $!binary-string;
+                        }
                     }
                     if %!o<squash-spaces> {
                         $str.=subst( / ^ <:Space>+ /, '', :g );
@@ -373,7 +411,6 @@ method !_calc_col_width {
     my Promise @promise;
     my Lock $lock = Lock.new();
     for @!portions -> $range {
-        #my Int %cache;
         @promise.push: start {
             my Int %cache;
             for |$range -> $row {
@@ -530,7 +567,6 @@ method !_table_row_to_string {
     my Promise @promise;
     my Lock $lock = Lock.new();
     for @!portions -> $range {
-        #my Int %cache;
         @promise.push: start {
             my Int %cache;
             do for |$range -> $row {
@@ -619,9 +655,7 @@ method !_table_row_to_string {
                         my Str @colors = @!tbl_orig.AT-POS($row).AT-POS($col).comb( / \e \[ <[\d;]>* m / );
                         if @colors.elems {
                             $str.=subst( / \x[feff] /, { @colors.shift }, :g );
-                            if @colors.elems {
-                                $str = $str ~ @colors[*-1];
-                            }
+                            $str ~= "\e[0m";
                         }
                     }
                     if $col != @!w_cols_calc.end {
@@ -838,10 +872,10 @@ Term::TablePrint - Print a table to the terminal and browse it interactively.
 
 
     my @table = ( [ 'id', 'name' ],
-                  [    1, 'Ruth' ],
-                  [    2, 'John' ],
-                  [    3, 'Mark' ],
-                  [    4, 'Nena' ], );
+                  [    1, 'banana' ],
+                  [    2, 'apple' ],
+                  [    3, 'orange' ],
+                  [    4, 'mango' ], );
 
 
     # Functional style:
@@ -917,7 +951,7 @@ table data.
 =item If the option I<squash-spaces> is enabled leading and trailing spaces are removed and multiple consecutive spaces are
 squashed to a single space.
 
-=item If an element looks like a number it is left-justified, else it is right-justified.
+=item If an element looks like a number it is right-justified, else it is left-justified.
 
 If the terminal is too narrow to print the table, the columns are adjusted to the available width automatically.
 
@@ -956,7 +990,8 @@ String displayed above the table.
 
 =head2 color
 
-If this option is enabled, SRG ANSI escape sequences can be used to color the screen output.
+If this option is enabled, SRG ANSI escape sequences can be used to color the screen output. Colors are reset to normal
+after each table cell.
 
 0 - off (default)
 
@@ -1117,7 +1152,7 @@ Matthäus Kiem <cuer2s@gmail.com>
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright 2016-2022 Matthäus Kiem.
+Copyright 2016-2023 Matthäus Kiem.
 
 This library is free software; you can redistribute it and/or modify it under the Artistic License 2.0.
 

@@ -1,6 +1,14 @@
 Revision history for Term::TablePrint
 
 
+1.6.1  2023-05-14
+        - META6: replace 'authors' with 'auth'.
+        - Bugfix documentation column alignment.
+        - Option 'max-rows' disabled by default.
+        - New option 'binary-filter'.
+        - Option 'color' affects also single row output.
+        - Option 'color': colors are reset after each cell.
+
 1.6.0  2022-11-27
         - Format scientific notation as number.
         - Don't share cache between threads.
