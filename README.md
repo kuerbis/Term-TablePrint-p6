@@ -12,10 +12,10 @@ SYNOPSIS
 
 
         my @table = ( [ 'id', 'name' ],
-                      [    1, 'banana' ],
-                      [    2, 'apple' ],
-                      [    3, 'orange' ],
-                      [    4, 'mango' ], );
+                      [    1, 'Ruth' ],
+                      [    2, 'John' ],
+                      [    3, 'Mark' ],
+                      [    4, 'Nena' ], );
 
 
         # Functional style:

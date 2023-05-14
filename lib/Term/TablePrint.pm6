@@ -313,9 +313,6 @@ method !_print_single_table_row ( Int $row, Str $footer, Int $search ) {
             my Str @colors = @!tbl_orig[0][$col].comb( / \e \[ <[\d;]>* m / );
             if @colors.elems {
                 $key.=subst( / \x[feff] /, { @colors.shift }, :g );
-                if @colors.elems {
-                    $key ~= @colors[*-1];
-                }
             }
         }
         my $value = @!tbl_orig[$row][$col] // $!undef;
@@ -872,10 +869,10 @@ Term::TablePrint - Print a table to the terminal and browse it interactively.
 
 
     my @table = ( [ 'id', 'name' ],
-                  [    1, 'banana' ],
-                  [    2, 'apple' ],
-                  [    3, 'orange' ],
-                  [    4, 'mango' ], );
+                  [    1, 'Ruth' ],
+                  [    2, 'John' ],
+                  [    3, 'Mark' ],
+                  [    4, 'Nena' ], );
 
 
     # Functional style:
