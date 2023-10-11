@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/kuerbis/Term-TablePrint-p6.svg?branch=master)](https://travis-ci.org/kuerbis/Term-TablePrint-p6)
+[![Actions Status](https://github.com/kuerbis/Term-TablePrint-p6/workflows/test/badge.svg)](https://github.com/kuerbis/Term-TablePrint-p6/actions)
 
 NAME
 ====
