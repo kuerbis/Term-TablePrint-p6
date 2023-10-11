@@ -19,7 +19,6 @@ jobs:
           - windows-latest
         raku-version:
           - "latest"
-          - "2023.08"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
