@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.6.1>;
+unit class Term::TablePrint:ver<1.6.2>;
 
 use Term::Choose;
 use Term::Choose::LineFold;
@@ -104,6 +104,11 @@ method print-table (
     self!_init_term();
     if ! @!tbl_orig.elems {
         $!tc.pause( ( 'Close with ENTER', ), :prompt( '"print-table": Empty table!' ) );
+        self!_end_term;
+        return;
+    }
+    if ! @!tbl_orig[0].elems {
+        $!tc.pause( ( 'Close with ENTER', ), :prompt( '"print-table": No columns!' ) );
         self!_end_term;
         return;
     }
@@ -1149,7 +1154,7 @@ Matthäus Kiem <cuer2s@gmail.com>
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright 2016-2023 Matthäus Kiem.
+Copyright 2016-2024 Matthäus Kiem.
 
 This library is free software; you can redistribute it and/or modify it under the Artistic License 2.0.
 

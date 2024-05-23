@@ -1,6 +1,10 @@
 Revision history for Term::TablePrint
 
 
+1.6.2  2024-05-23
+        - Return if the table has no columns.
+        - Term::Choose minimum version 1.9.3.
+
 1.6.1  2023-05-14
         - META6: replace 'authors' with 'auth'.
         - Bugfix documentation column alignment.

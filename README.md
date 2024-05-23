@@ -1,5 +1,3 @@
-[![Actions Status](https://github.com/kuerbis/Term-TablePrint-p6/workflows/test/badge.svg)](https://github.com/kuerbis/Term-TablePrint-p6/actions)
-
 NAME
 ====
 
@@ -286,7 +284,7 @@ Matthäus Kiem <cuer2s@gmail.com>
 LICENSE AND COPYRIGHT
 =====================
 
-Copyright 2016-2023 Matthäus Kiem.
+Copyright 2016-2024 Matthäus Kiem.
 
 This library is free software; you can redistribute it and/or modify it under the Artistic License 2.0.
 
