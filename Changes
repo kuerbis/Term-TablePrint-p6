@@ -1,6 +1,12 @@
 Revision history for Term::TablePrint
 
 
+1.6.3  2024-05-31
+        - Code refactoring.
+        - Term::Choose minimum version 1.9.4.
+        - Workflows test: don't test Windows.
+        - Update documentation.
+
 1.6.2  2024-05-23
         - Return if the table has no columns.
         - Term::Choose minimum version 1.9.3.

@@ -1,15 +1,13 @@
 use v6;
-unit class Term::TablePrint:ver<1.6.2>;
+unit class Term::TablePrint:ver<1.6.3>;
 
 use Term::Choose;
+use Term::Choose::Constant;
 use Term::Choose::LineFold;
 use Term::Choose::Screen;
 use Term::Choose::Util :insert-sep;
 
 has %!o;
-
-subset Int_0_to_2 of Int where * == 0|1|2;
-subset Int_0_or_1 of Int where * == 0|1;
 
 has UInt       $.max-rows          = 0;
 has UInt       $.min-col-width     = 30;
@@ -46,11 +44,12 @@ has     %!map_return_wr_table = :0last, :1window_width_changed, :2enter_search_s
 
 has Int  $!row_count;
 has Int  $!tab_w;
+#has Int  $!extra_w = $*DISTRO.is-win ?? 0 !! cursor-width;     # Term::TablePrint not installable on Windows
+has Int  $!extra_w = cursor-width;
 has Str $!binary-string = 'BNRY';
 has Str  $!info_row;
 has Str  $!thsd_sep = ',';
 has Hash $!p_bar;
-
 has Term::Choose $!tc;
 
 
@@ -150,8 +149,8 @@ method print-table (
 
 
 method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header is rw ) {
-    if ! $term_w || $term_w != get-term-size().[0] + 1 { # + 1 if not win32
-        $term_w = get-term-size().[0] + 1;
+    if ! $term_w || $term_w != get-term-size().[0] + $!extra_w {
+        $term_w = get-term-size().[0] + $!extra_w;
         self!_init_progress_bar( 1 );
         my $ok = self!_calc_avail_col_width( $term_w );
         if ! $ok {
@@ -195,7 +194,7 @@ method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header 
     my Int $row_is_expanded = 0;
 
     loop {
-        if $term_w != get-term-size().[0] + 1 {
+        if $term_w != get-term-size().[0] + $!extra_w {
             return %!map_return_wr_table<window_width_changed>;
         }
         if ( $!row_count <= 1 ) {
@@ -277,7 +276,7 @@ method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header 
 
 
 method !_print_single_table_row ( Int $row, Str $footer, Int $search ) {
-    my Int $term_w = get-term-size().[0] + 1;
+    my Int $term_w = get-term-size().[0] + $!extra_w;
     my Int $max_key_w = @!w_heads.max + 1; #
     if $max_key_w > $term_w div 3 {
         $max_key_w = $term_w div 3;
@@ -293,10 +292,10 @@ method !_print_single_table_row ( Int $row, Str $footer, Int $search ) {
             $key = $key.gist;
         }
         if %!o<color> { # elsif
-            $key.=subst( / \x[feff] /, '', :g );
-            $key.=subst( / \e \[ <[\d;]>* m /, "\x[feff]", :g );
+            $key.=subst( / $(ph-char) /, '', :g );
+            $key.=subst( &rx-color, ph-char, :g );
         }
-        if %!o<binary-filter> && $key.substr( 0, 100 ).match: /<[\x00..\x08\x0B..\x0C\x0E..\x1F]>/ {
+        if %!o<binary-filter> && $key.substr( 0, 100 ).match: &rx-is-binary {
             if %!o<binary-filter> == 2 {
                 $key = ( @!tbl_orig[0][$col] // %!o<undef> ).encode>>.fmt('%02X').Str;
             }
@@ -306,7 +305,7 @@ method !_print_single_table_row ( Int $row, Str $footer, Int $search ) {
         }
         $key.=subst( / \t /,  ' ', :g );
         $key.=subst( / \v+ /,  '  ', :g );
-        $key.=subst( / <:Cc+:Noncharacter_Code_Point+:Cs> /, '', :g );
+        $key.=subst( &rx-invalid-char, '', :g );
         my Int $key_w = print-columns( $key );
         if $key_w > $max_key_w {
             $key = to-printwidth( $key, $max_key_w );
@@ -315,9 +314,9 @@ method !_print_single_table_row ( Int $row, Str $footer, Int $search ) {
             $key = ( ' ' x ( $max_key_w - $key_w ) ) ~ $key;
         }
         if %!o<color> {
-            my Str @colors = @!tbl_orig[0][$col].comb( / \e \[ <[\d;]>* m / );
+            my Str @colors = @!tbl_orig[0][$col].comb( &rx-color );
             if @colors.elems {
-                $key.=subst( / \x[feff] /, { @colors.shift }, :g );
+                $key.=subst( / $(ph-char) /, { @colors.shift }, :g );
             }
         }
         my $value = @!tbl_orig[$row][$col] // $!undef;
@@ -360,10 +359,10 @@ method !_copy_table {
                         $str = $str.gist;
                     }
                     if %!o<color> { # elsif
-                        $str.=subst( / \x[feff] /, '', :g );
-                        $str.=subst( / \e \[ <[\d;]>* m /, "\x[feff]", :g );
+                        $str.=subst( / $(ph-char) /, '', :g );
+                        $str.=subst( &rx-color, ph-char, :g );
                     }
-                    if %!o<binary-filter> && $str.substr( 0, 100 ).match: /<[\x00..\x08\x0B..\x0C\x0E..\x1F]>/ {
+                    if %!o<binary-filter> && $str.substr( 0, 100 ).match: &rx-is-binary {
                         if %!o<binary-filter> == 2 {
                             $str = ( @!tbl_orig.AT-POS($row).AT-POS($col) // %!o<undef> ).encode>>.fmt('%02X').Str;
                         }
@@ -372,13 +371,12 @@ method !_copy_table {
                         }
                     }
                     if %!o<squash-spaces> {
-                        $str.=subst( / ^ <:Space>+ /, '', :g );
-                        $str.=subst( / <:Space>+ $ /, '', :g );
+                        $str.=trim;
                         $str.=subst( / <:Space>+ /,  ' ', :g );
                     }
                     $str.=subst( / \t /,  ' ', :g );
                     $str.=subst( / \v+ /,  '  ', :g );
-                    $str.=subst( / <:Cc+:Noncharacter_Code_Point+:Cs> /, '', :g ); ##
+                    $str.=subst( &rx-invalid-char, '', :g );
                     $str;
                 }
             }
@@ -654,9 +652,9 @@ method !_table_row_to_string {
                         }
                     }
                     if %!o<color> && @!tbl_orig.AT-POS($row).AT-POS($col).defined { #
-                        my Str @colors = @!tbl_orig.AT-POS($row).AT-POS($col).comb( / \e \[ <[\d;]>* m / );
+                        my Str @colors = @!tbl_orig.AT-POS($row).AT-POS($col).comb( &rx-color );
                         if @colors.elems {
-                            $str.=subst( / \x[feff] /, { @colors.shift }, :g );
+                            $str.=subst( / $(ph-char) /, { @colors.shift }, :g );
                             $str ~= "\e[0m";
                         }
                     }
@@ -793,7 +791,7 @@ method !_set_progress_bar {
     if ! $!p_bar<count_progress_bars> {
         return Int, Int;
     }
-    my Int $term_w = get-term-size().[0] + 1;
+    my Int $term_w = get-term-size().[0] + $!extra_w;
     my Int $count;
     if $!p_bar<merge_progress_bars> {
         $!p_bar<fmt> = 'Computing: [%s%s]';
@@ -1141,6 +1139,10 @@ C<tput>.
 =head2 Monospaced font
 
 It is required a terminal that uses a monospaced font which supports the printed characters.
+
+=head2 Restrictions
+
+Term::TablePrint is not installable on Windows.
 
 =head1 CREDITS
 

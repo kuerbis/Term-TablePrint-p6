@@ -271,6 +271,11 @@ Monospaced font
 
 It is required a terminal that uses a monospaced font which supports the printed characters.
 
+Restrictions
+------------
+
+Term::TablePrint is not installable on Windows.
+
 CREDITS
 =======
 
