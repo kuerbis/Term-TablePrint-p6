@@ -3,7 +3,7 @@
   "build-depends": [
   ],
   "depends": [
-    "Term::Choose:ver<1.9.4+>",
+    "Term::Choose:ver<1.9.6+>",
     "Term::Choose::Util:ver<1.4.6+>"
   ],
   "description": "Print a table to the terminal and browse it interactively.",
@@ -25,5 +25,5 @@
   "test-depends": [
     "Test"
   ],
-  "version": "1.6.3"
+  "version": "1.6.4"
 }

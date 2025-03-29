@@ -1,6 +1,10 @@
 Revision history for Term::TablePrint
 
 
+1.6.4  2025-03-29
+        - Update 'line-fold'.
+        - Term::Choose minimum version 1.9.6.
+
 1.6.3  2024-05-31
         - Code refactoring.
         - Term::Choose minimum version 1.9.4.

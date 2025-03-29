@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.6.3>;
+unit class Term::TablePrint:ver<1.6.4>;
 
 use Term::Choose;
 use Term::Choose::Constant;
@@ -27,14 +27,14 @@ has Str        $.footer            = '';
 has Str        $.prompt            = '';
 has Str        $.undef             = '';
 
-has       @!tbl_orig;
-has       @!tbl_copy;
-has Int   @!w_heads;
-has       @!w_cols;
-has Int   @!w_cols_calc;
-has       @!w_int;
-has       @!w_fract;
-has Int   @!w_fract_calc;
+has     @!tbl_orig;
+has     @!tbl_copy;
+has Int @!w_heads;
+has     @!w_cols;
+has Int @!w_cols_calc;
+has     @!w_int;
+has     @!w_fract;
+has Int @!w_fract_calc;
 
 has Array @!portions;
 
@@ -44,8 +44,6 @@ has     %!map_return_wr_table = :0last, :1window_width_changed, :2enter_search_s
 
 has Int  $!row_count;
 has Int  $!tab_w;
-#has Int  $!extra_w = $*DISTRO.is-win ?? 0 !! cursor-width;     # Term::TablePrint not installable on Windows
-has Int  $!extra_w = cursor-width;
 has Str $!binary-string = 'BNRY';
 has Str  $!info_row;
 has Str  $!thsd_sep = ',';
@@ -149,8 +147,8 @@ method print-table (
 
 
 method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header is rw ) {
-    if ! $term_w || $term_w != get-term-size().[0] + $!extra_w {
-        $term_w = get-term-size().[0] + $!extra_w;
+    if ! $term_w || $term_w != get-term-size().[0] + extra-w {
+        $term_w = get-term-size().[0] + extra-w;
         self!_init_progress_bar( 1 );
         my $ok = self!_calc_avail_col_width( $term_w );
         if ! $ok {
@@ -194,7 +192,7 @@ method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header 
     my Int $row_is_expanded = 0;
 
     loop {
-        if $term_w != get-term-size().[0] + $!extra_w {
+        if $term_w != get-term-size().[0] + extra-w {
             return %!map_return_wr_table<window_width_changed>;
         }
         if ( $!row_count <= 1 ) {
@@ -276,7 +274,7 @@ method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header 
 
 
 method !_print_single_table_row ( Int $row, Str $footer, Int $search ) {
-    my Int $term_w = get-term-size().[0] + $!extra_w;
+    my Int $term_w = get-term-size().[0] + extra-w;
     my Int $max_key_w = @!w_heads.max + 1; #
     if $max_key_w > $term_w div 3 {
         $max_key_w = $term_w div 3;
@@ -323,7 +321,7 @@ method !_print_single_table_row ( Int $row, Str $footer, Int $search ) {
         my Str $subseq_tab = ' ' x ( $max_key_w + $sep_w );
         my Int $count = 0;
 
-        for line-fold( $value, $max_value_w, :color( %!o<color> ), :binary-filter( %!o<binary-filter> ) ) -> $line {
+        for line-fold( $value, :width( $max_value_w ), :color( %!o<color> ), :binary-filter( %!o<binary-filter> ), :0join ) -> $line {
             if ! $count++ {
                 @lines.push: $key ~ $separator ~ $line;
             }
@@ -791,7 +789,7 @@ method !_set_progress_bar {
     if ! $!p_bar<count_progress_bars> {
         return Int, Int;
     }
-    my Int $term_w = get-term-size().[0] + $!extra_w;
+    my Int $term_w = get-term-size().[0] + extra-w;
     my Int $count;
     if $!p_bar<merge_progress_bars> {
         $!p_bar<fmt> = 'Computing: [%s%s]';
@@ -1156,7 +1154,7 @@ Matthäus Kiem <cuer2s@gmail.com>
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright 2016-2024 Matthäus Kiem.
+Copyright 2016-2025 Matthäus Kiem.
 
 This library is free software; you can redistribute it and/or modify it under the Artistic License 2.0.
 
