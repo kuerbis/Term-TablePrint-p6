@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.6.4>;
+unit class Term::TablePrint:ver<1.6.5>;
 
 use Term::Choose;
 use Term::Choose::Constant;
@@ -10,18 +10,20 @@ use Term::Choose::Util :insert-sep;
 has %!o;
 
 has UInt       $.max-rows          = 0;
+has UInt       $.max-width-exp     = 0;
 has UInt       $.min-col-width     = 30;
 has UInt       $.progress-bar      = 5_000;
 has UInt       $.tab-width         = 2;
 has Int_0_or_1 $.loop              = 0; # private
 has Int_0_or_1 $.mouse             = 0;
+has Int_0_or_1 $.pad-row-edges     = 0;
 has Int_0_or_1 $.save-screen       = 0;
 has Int_0_or_1 $.squash-spaces     = 0;
+has Int_0_or_1 $.table-expand      = 1;
 has Int_0_or_1 $.trunc-fract-first = 1;
 has Int_0_to_2 $.binary-filter     = 0;
 has Int_0_to_2 $.color             = 0;
 has Int_0_to_2 $.search            = 1;
-has Int_0_to_2 $.table-expand      = 1;
 has Str        $.decimal-separator = '.';
 has Str        $.footer            = '';
 has Str        $.prompt            = '';
@@ -44,6 +46,7 @@ has     %!map_return_wr_table = :0last, :1window_width_changed, :2enter_search_s
 
 has Int  $!row_count;
 has Int  $!tab_w;
+has Int $!edge_w = 0;
 has Str $!binary-string = 'BNRY';
 has Str  $!info_row;
 has Str  $!thsd_sep = ',';
@@ -80,24 +83,27 @@ sub print-table ( @orig_table, *%opt ) is export( :DEFAULT, :print-table ) {
 method print-table (
         @!tbl_orig,
         UInt       :$max-rows          = $!max-rows,
+        UInt       :$max-width-exp     = $!max-width-exp,
         UInt       :$min-col-width     = $!min-col-width,
         UInt       :$progress-bar      = $!progress-bar,
         UInt       :$tab-width         = $!tab-width,
         Int_0_or_1 :$mouse             = $!mouse,
+        Int_0_or_1 :$pad-row-edges     = $!pad-row-edges,
         Int_0_or_1 :$save-screen       = $!save-screen,
         Int_0_or_1 :$squash-spaces     = $!squash-spaces,
+        Int_0_or_1 :$table-expand      = $!table-expand,
         Int_0_or_1 :$trunc-fract-first = $!trunc-fract-first,
         Int_0_to_2 :$binary-filter     = $!binary-filter;
         Int_0_to_2 :$color             = $!color,
         Int_0_to_2 :$search            = $!search,
-        Int_0_to_2 :$table-expand      = $!table-expand,
         Str        :$decimal-separator = $!decimal-separator,
         Str        :$footer            = $!footer,
         Str        :$prompt            = $!prompt,
         Str        :$undef             = $!undef,
     ) {
-    %!o = :$max-rows, :$min-col-width, :$progress-bar, :$tab-width, :$mouse, :$save-screen, :$squash-spaces, :$binary-filter,
-          :$color, :$search, :$table-expand, :$decimal-separator, :$footer, :$prompt, :$undef, :$trunc-fract-first;
+    %!o = :$max-rows, :$max-width-exp, :$min-col-width, :$progress-bar, :$tab-width, :$mouse, :$pad-row-edges,
+          :$save-screen, :$squash-spaces, :$binary-filter, :$color, :$search, :$table-expand, :$decimal-separator,
+          :$footer, :$prompt, :$undef, :$trunc-fract-first;
     self!_init_term();
     if ! @!tbl_orig.elems {
         $!tc.pause( ( 'Close with ENTER', ), :prompt( '"print-table": Empty table!' ) );
@@ -119,8 +125,11 @@ method print-table (
     if %!o<tab-width> %% 2 {
         $!tab_w++;
     }
+    if %!o<pad-row-edges> {
+        $!edge_w = 1;
+    }
     self!_row_count( @!tbl_orig.elems );
-    self!_init_progress_bar( 3 );
+    self!_init_progress_bar( $!row_count * 3 - 1 );
     self!_split_work_for_threads();
     self!_copy_table();
     self!_calc_col_width();
@@ -139,6 +148,7 @@ method print-table (
         elsif $next == %!map_return_wr_table<returned_from_filtered_table> {
             self!_reset_search();
         }
+        self!_init_progress_bar( $!row_count );
         next;
     }
     self!_end_term();
@@ -149,12 +159,11 @@ method print-table (
 method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header is rw ) {
     if ! $term_w || $term_w != get-term-size().[0] + extra-w {
         $term_w = get-term-size().[0] + extra-w;
-        self!_init_progress_bar( 1 );
         my $ok = self!_calc_avail_col_width( $term_w );
         if ! $ok {
             return %!map_return_wr_table<last>;
         }
-        $table_w = [+] |@!w_cols_calc, $!tab_w * @!w_cols_calc.end;
+        $table_w = [+] |@!w_cols_calc, $!tab_w * @!w_cols_calc.end, 2 * $!edge_w;
         if ! $table_w {
             return %!map_return_wr_table<last>;
         }
@@ -188,8 +197,8 @@ method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header 
         }
     }
     my Int $old_row = 0;
-    my Int $auto_jumped_to_row_0 = 2;
-    my Int $row_is_expanded = 0;
+    my Int $auto_jumped_to_row_0 = 0;
+    my Int $row_was_expanded = 0;
 
     loop {
         if $term_w != get-term-size().[0] + extra-w {
@@ -225,75 +234,68 @@ method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header 
             }
         }
         if ! %!o<table-expand> {
+            return $return if $row == 0;
+            next;
+        }
+        if %*ENV<TC_RESET_AUTO_UP> == 1 {  # 1 if any key other than Return/Enter was pressed
+            $auto_jumped_to_row_0 = 0;
+            $row_was_expanded = 0;
+        }
+        if $row_was_expanded {
             if $row == 0 {
                 return $return;
             }
+            $old_row = 0;
+            $auto_jumped_to_row_0 = 1;
+            $row_was_expanded = 0;
             next;
         }
-        else {
-            if $old_row == $row {
-                if $row == 0 {
-                    if %!o<table-expand> {
-                        if $row_is_expanded {
-                            return $return;
-                        }
-                        if $auto_jumped_to_row_0 == 1 {
-                            return $return;
-                        }
-                    }
-                    $auto_jumped_to_row_0 = 0;
-                }
-                elsif %*ENV<TC_RESET_AUTO_UP> == 1 {
-                    $auto_jumped_to_row_0 = 0;
-                }
-                else {
-                    $old_row = 0;
-                    $auto_jumped_to_row_0 = 1;
-                    $row_is_expanded = 0;
-                    next;
-                }
-            }
-            $old_row = $row;
-            $row_is_expanded = 1;
-            if $!info_row && $row == $tbl_print.end {
-                $!tc.pause( ( 'Close', ), :prompt( $!info_row ) );
-                next;
-            }
-            my Int $orig_row;
-            if @!map_indexes.elems {
-                $orig_row = @!map_indexes[$row];
-            }
-            else {
-                $orig_row = $row + 1; # because $tbl_print has no header row while $tbl_orig has a header row
-            }
-            self!_print_single_table_row( $orig_row, $footer, %!o<search> );
+        if $auto_jumped_to_row_0 {
+            return $return;
         }
+        $old_row = $row;
+        $row_was_expanded = 1;
+        if $!info_row && $row == $tbl_print.end {
+            $!tc.pause( ( 'Close', ), :prompt( $!info_row ) );
+            next;
+        }
+        my Int $orig_row;
+        if @!map_indexes.elems {
+            $orig_row = @!map_indexes[$row];
+        }
+        else {
+            $orig_row = $row + 1; # because $tbl_print has no header row while $tbl_orig has a header row
+        }
+        self!_print_single_table_row( $orig_row, $footer, %!o<search> );
         %*ENV<TC_RESET_AUTO_UP>:delete;
     }
 }
 
 
 method !_print_single_table_row ( Int $row, Str $footer, Int $search ) {
-    my Int $term_w = get-term-size().[0] + extra-w;
+    my Int $avail_w = get-term-size().[0];
+    if %!o<max-width-exp> && %!o<max-width-exp> < $avail_w {
+        $avail_w = %!o<max-width-exp>;
+    }
     my Int $max_key_w = @!w_heads.max + 1; #
-    if $max_key_w > $term_w div 3 {
-        $max_key_w = $term_w div 3;
+    if $max_key_w > $avail_w div 3 {
+        $max_key_w = $avail_w div 3;
     }
     my Str $separator = ' : ';
     my Int $sep_w = $separator.chars;
-    my Int $max_value_w = $term_w - ( $max_key_w + $sep_w + 1 ); #
+    my Int $max_value_w = $avail_w - ( $max_key_w + $sep_w );
     my Str @lines = ' Close with ENTER', ' ';
 
     for ^@!tbl_orig[0] -> $col {
         my $key = ( @!tbl_orig[0][$col] // %!o<undef> );
         if $key ~~ Buf {
-            $key = $key.gist;
+            $key = $key.raku; ##
         }
-        if %!o<color> { # elsif
+        elsif %!o<color> {
             $key.=subst( / $(ph-char) /, '', :g );
             $key.=subst( &rx-color, ph-char, :g );
         }
-        if %!o<binary-filter> && $key.substr( 0, 100 ).match: &rx-is-binary {
+        if %!o<binary-filter> && $key.substr( 0, 100 ).match: &rx-is-binary { ##
             if %!o<binary-filter> == 2 {
                 $key = ( @!tbl_orig[0][$col] // %!o<undef> ).encode>>.fmt('%02X').Str;
             }
@@ -301,9 +303,11 @@ method !_print_single_table_row ( Int $row, Str $footer, Int $search ) {
                 $key = $!binary-string;
             }
         }
-        $key.=subst( / \t /,  ' ', :g );
-        $key.=subst( / \v+ /,  '  ', :g );
-        $key.=subst( &rx-invalid-char, '', :g );
+        elsif $key ~~ &rx-invalid-char {
+            $key.=subst( / \t /,  ' ', :g );
+            $key.=subst( / \v+ /,  '  ', :g );
+            $key.=subst( &rx-invalid-char, '', :g );
+        }
         my Int $key_w = print-columns( $key );
         if $key_w > $max_key_w {
             $key = to-printwidth( $key, $max_key_w );
@@ -311,13 +315,16 @@ method !_print_single_table_row ( Int $row, Str $footer, Int $search ) {
         elsif $key_w < $max_key_w { # >
             $key = ( ' ' x ( $max_key_w - $key_w ) ) ~ $key;
         }
-        if %!o<color> {
+        if %!o<color> && @!tbl_orig[0][$col] !~~ Buf {
             my Str @colors = @!tbl_orig[0][$col].comb( &rx-color );
             if @colors.elems {
                 $key.=subst( / $(ph-char) /, { @colors.shift }, :g );
             }
         }
         my $value = @!tbl_orig[$row][$col] // $!undef;
+        if $value ~~ Buf {
+            $value = $value.raku;
+        }
         my Str $subseq_tab = ' ' x ( $max_key_w + $sep_w );
         my Int $count = 0;
 
@@ -337,44 +344,45 @@ method !_print_single_table_row ( Int $row, Str $footer, Int $search ) {
 
 
 method !_copy_table {
-    my ( Int $count, Int $step ) = self!_set_progress_bar;       #
+    my Int $show_pg = self!_set_progress_bar;
     my Promise @promise;
     my Lock $lock = Lock.new();
     for @!portions -> $range {
         @promise.push: start {
             do for |$range -> $row {
-                if $step {                                       #
-                    $lock.protect( {                             #
-                        ++$count;                                #
-                        if $count %% $step {                     #
-                            self!_update_progress_bar( $count ); #
-                        }                                        #
-                    } );                                         #
+                if $show_pg {
+                    $lock.protect( {
+                        if ++$!p_bar<count> > $!p_bar<next_update> {
+                            self!_update_progress_bar();
+                        }
+                    } );
                 }
                 do for ^@!tbl_orig[0] -> $col {
-                    my $str = ( @!tbl_orig.AT-POS($row).AT-POS($col) // %!o<undef> );  # this is where the copying happens
+                    my $str = ( @!tbl_orig[$row][$col] // %!o<undef> );  # this is where the copying happens
                     if $str ~~ Buf {
-                        $str = $str.gist;
+                        $str = $str.raku; ##
                     }
-                    if %!o<color> { # elsif
+                    elsif %!o<color> {
                         $str.=subst( / $(ph-char) /, '', :g );
                         $str.=subst( &rx-color, ph-char, :g );
                     }
-                    if %!o<binary-filter> && $str.substr( 0, 100 ).match: &rx-is-binary {
+                    if %!o<binary-filter> && $str.substr( 0, 100 ).match: &rx-is-binary { ##
                         if %!o<binary-filter> == 2 {
-                            $str = ( @!tbl_orig.AT-POS($row).AT-POS($col) // %!o<undef> ).encode>>.fmt('%02X').Str;
+                            $str = ( @!tbl_orig[$row][$col] // %!o<undef> ).encode>>.fmt('%02X').Str;
                         }
                         else {
                             $str = $!binary-string;
                         }
                     }
+                    elsif $str ~~ &rx-invalid-char {
+                        $str.=subst( / \t /,  ' ', :g );
+                        $str.=subst( / \v+ /,  '  ', :g );
+                        $str.=subst( &rx-invalid-char, '', :g );
+                    }
                     if %!o<squash-spaces> {
                         $str.=trim;
                         $str.=subst( / <:Space>+ /,  ' ', :g );
                     }
-                    $str.=subst( / \t /,  ' ', :g );
-                    $str.=subst( / \v+ /,  '  ', :g );
-                    $str.=subst( &rx-invalid-char, '', :g );
                     $str;
                 }
             }
@@ -386,19 +394,16 @@ method !_copy_table {
             @!tbl_copy.push: @p_rows;
         }
     }
-    if $step {                                                   #
-        self!_last_update_progress_bar( $count );                #
-    }                                                            #
     return;
 }
 
 
 method !_calc_col_width {
-    my ( Int $count, Int $step ) = self!_set_progress_bar;       #
+    my Int $show_pg = self!_set_progress_bar;
     my Int @idx_cols = 0 .. @!tbl_copy[0].end; # new indexes
     @!w_heads = ();
     for @idx_cols -> $col {
-       @!w_heads.BIND-POS( $col, print-columns( @!tbl_copy.AT-POS(0).AT-POS($col) ) );
+       @!w_heads[$col] = print-columns( @!tbl_copy[0][$col] );
     }
     my Int $size = @!tbl_copy[0].elems;
     my Int @w_cols[$size]  = ( 1 xx $size );
@@ -412,28 +417,27 @@ method !_calc_col_width {
         @promise.push: start {
             my Int %cache;
             for |$range -> $row {
-                if $step {                                       #
-                    $lock.protect( {                             #
-                        ++$count;                                #
-                        if $count %% $step {                     #
-                            self!_update_progress_bar( $count ); #
-                        }                                        #
-                    } );                                         #
-                }                                                #
+                if $show_pg {
+                    $lock.protect( {
+                        if ++$!p_bar<count> > $!p_bar<next_update> {
+                            self!_update_progress_bar();
+                        }
+                    } );
+                }
                 for @idx_cols -> $col {
-                    if @!tbl_copy.AT-POS($row).AT-POS($col).chars {
-                        if @!tbl_copy.AT-POS($row).AT-POS($col) ~~ / ^ ( <[-+]>? <[0..9]>+ )? ( $ds <[0..9]>+ )? $ / {
-                            if $0.defined && $0.chars > @w_int.AT-POS($col) {
-                                @w_int.BIND-POS( $col, $0.chars );
+                    if @!tbl_copy[$row][$col].chars {
+                        if @!tbl_copy[$row][$col] ~~ / ^ ( <[-+]>? <[0..9]>+ )? ( $ds <[0..9]>+ )? $ / {
+                            if $0.defined && $0.chars > @w_int[$col] {
+                                @w_int[$col] = $0.chars;
                             }
-                            if $1.defined && $1.chars > @w_fract.AT-POS($col) {
-                                @w_fract.BIND-POS( $col, $1.chars );
+                            if $1.defined && $1.chars > @w_fract[$col] {
+                                @w_fract[$col] = $1.chars;
                             }
                         }
                         else {
-                            my $width = print-columns( @!tbl_copy.AT-POS($row).AT-POS($col), %cache );
-                            if $width > @w_cols.AT-POS($col) {
-                                @w_cols.BIND-POS( $col, $width );
+                            my $width = print-columns( @!tbl_copy[$row][$col], %cache );
+                            if $width > @w_cols[$col] {
+                                @w_cols[$col] = $width;
                             }
                         }
                     }
@@ -444,30 +448,27 @@ method !_calc_col_width {
     await @promise;
     @!portions[0].unshift: $header_idx;
     for @idx_cols -> $col {
-        if @w_int.AT-POS($col) + @w_fract.AT-POS($col) > @w_cols.AT-POS($col) {
-            @w_cols.BIND-POS( $col, @w_int.AT-POS($col) + @w_fract.AT-POS($col) );
+        if @w_int[$col] + @w_fract[$col] > @w_cols[$col] {
+            @w_cols[$col] = @w_int[$col] + @w_fract[$col];
         }
     }
     @!w_cols  := @w_cols;
     @!w_int   := @w_int;
     @!w_fract := @w_fract;
-    if $step {                                                   #
-        self!_last_update_progress_bar( $count );                #
-    }                                                            #
 }
 
 
 method !_calc_avail_col_width( $term_w ) {
     @!w_cols_calc = @!w_cols;
     @!w_fract_calc = @!w_fract;
-    my Int $avail_w = $term_w - $!tab_w * @!w_cols_calc.end;
+    my Int $avail_w = $term_w - ( $!tab_w * @!w_cols_calc.end + 2 * $!edge_w );
     my Int $sum = [+] @!w_cols_calc;
     if $sum < $avail_w {
         HEAD: loop {
             my Int $count = 0;
             for ^@!w_heads -> $i {
-                if @!w_heads.AT-POS($i) > @!w_cols_calc.AT-POS($i) {
-                    ++@!w_cols_calc.AT-POS($i);
+                if @!w_heads[$i] > @!w_cols_calc[$i] {
+                    ++@!w_cols_calc[$i];
                     ++$count;
                     last HEAD if ( $sum + $count ) == $avail_w;
                 }
@@ -487,10 +488,10 @@ method !_calc_avail_col_width( $term_w ) {
             TRUNC_FRACT: while $sum > $avail_w {
                 my Int $prev_sum = $sum;
                 for ^@!w_cols_calc -> $col {
-                    if @!w_fract_calc.AT-POS($col) && @!w_fract_calc.AT-POS($col) > 3 {
+                    if @!w_fract_calc[$col] && @!w_fract_calc[$col] > 3 {
                        # 3 == 1 decimal separator + 2 decimal places
-                        --@!w_fract_calc.AT-POS($col);
-                        --@!w_cols_calc.AT-POS($col);
+                        --@!w_fract_calc[$col];
+                        --@!w_cols_calc[$col];
                         --$sum;
                         if $sum == $avail_w {
                             last TRUNC_FRACT;
@@ -508,18 +509,18 @@ method !_calc_avail_col_width( $term_w ) {
         TRUNC_COLS: while $sum > $avail_w {
             ++$percent;
             for ^@!w_cols_calc -> $col {
-                if @!w_cols_calc.AT-POS($col) > $min_col_w {
-                    my Int $reduced_col_w = _minus_x_percent( @!w_cols_calc.AT-POS($col), $percent );
+                if @!w_cols_calc[$col] > $min_col_w {
+                    my Int $reduced_col_w = _minus_x_percent( @!w_cols_calc[$col], $percent );
                     if $reduced_col_w < $min_col_w {
                         $reduced_col_w = $min_col_w;
                     }
-                    if @!w_fract_calc.AT-POS($col) > 2 {
-                        @!w_fract_calc.BIND-POS( $col, @!w_fract_calc.AT-POS($col) - @!w_cols_calc.AT-POS($col) - $reduced_col_w );
-                        if @!w_fract_calc.AT-POS($col) < 2 {
-                            @!w_fract_calc.BIND-POS( $col, 2 );
+                    if @!w_fract_calc[$col] > 2 {
+                        @!w_fract_calc[$col] = @!w_fract_calc[$col] - @!w_cols_calc[$col] - $reduced_col_w;
+                        if @!w_fract_calc[$col] < 2 {
+                            @!w_fract_calc[$col] = 2;
                         }
                     }
-                    @!w_cols_calc.BIND-POS( $col, $reduced_col_w );
+                    @!w_cols_calc[$col] = $reduced_col_w;
                 }
             }
             my Int $prev_sum = $sum;
@@ -538,8 +539,8 @@ method !_calc_avail_col_width( $term_w ) {
             REMAINDER_W: loop {
                 my Int $prev_remainder_w = $remainder_w;
                 for ^@!w_cols_calc -> $col {
-                    if @!w_cols_calc.AT-POS($col) < @!w_cols.AT-POS($col) {
-                        @!w_cols_calc.BIND-POS( $col, @!w_cols_calc.AT-POS($col) + 1 );
+                    if @!w_cols_calc[$col] < @!w_cols[$col] {
+                        @!w_cols_calc[$col] = @!w_cols_calc[$col] + 1;
                         --$remainder_w;
                         if $remainder_w == 0 {
                             last REMAINDER_W;
@@ -559,114 +560,112 @@ method !_calc_avail_col_width( $term_w ) {
 method !_table_row_to_string {
     my Int @idx_cols = 0 .. @!tbl_copy[0].end;
     my Str $tab = ( ' ' x $!tab_w div 2 ) ~ '|' ~ ( ' ' x $!tab_w div 2 );
-    my ( Int $count, Int $step ) = self!_set_progress_bar;       #
+    my Int $show_pg = self!_set_progress_bar;
     my Str $ds = %!o<decimal-separator>;
     my Int $one_precision_w = sprintf( "%.1e", 123 ).chars;
+    my Str $lrb = ' ' x $!edge_w;
     my Promise @promise;
     my Lock $lock = Lock.new();
     for @!portions -> $range {
         @promise.push: start {
             my Int %cache;
             do for |$range -> $row {
-                my Str $str = '';
+                my Str $str = $lrb;
                 for @idx_cols -> $col {
-                    if ! @!tbl_copy.AT-POS($row).AT-POS($col).chars {
-                            $str = $str ~ ' ' x @!w_cols_calc.AT-POS($col);
+                    if ! @!tbl_copy[$row][$col].chars {
+                            $str ~= ' ' x @!w_cols_calc[$col];
                     }
-                    elsif @!tbl_copy.AT-POS($row).AT-POS($col) ~~ / ^ ( <[-+]>? <[0..9]>+ )? ( $ds <[0..9]>+ )? ( <[eE]> <[-+]>? <[0..9]>+ )? $ / {
+                    elsif @!tbl_copy[$row][$col] ~~ / ^ ( <[-+]>? <[0..9]>+ )? ( $ds <[0..9]>+ )? ( <[eE]> <[-+]>? <[0..9]>+ )? $ / {
                         my Str $number;
                         if $2 {
                             if $0 || $1 {
-                                $number = @!tbl_copy.AT-POS($row).AT-POS($col);
+                                $number = @!tbl_copy[$row][$col];
                                 if $2.starts-with( 'E' ) {
                                     $number ~~ s/E/e/;
                                 }
                             }
                             else {
                                 # not a number
-                                $number = sprintf "%-*.*s", @!w_cols_calc.AT-POS($col), @!w_cols_calc.AT-POS($col), @!tbl_copy.AT-POS($row).AT-POS($col);
+                                $number = sprintf "%-*.*s", @!w_cols_calc[$col], @!w_cols_calc[$col], @!tbl_copy[$row][$col];
                             }
                         }
                         else {
                             # all $fract's of a column must have the same length
                             my Str $fract = ''; 
-                            if @!w_fract_calc.AT-POS($col) {
+                            if @!w_fract_calc[$col] {
                                 if $1.defined {
-                                    if $1.chars > @!w_fract_calc.AT-POS($col) {
-                                        $fract = $1.substr( 0, @!w_fract_calc.AT-POS($col) );
+                                    if $1.chars > @!w_fract_calc[$col] {
+                                        $fract = $1.substr( 0, @!w_fract_calc[$col] );
                                     }
-                                    elsif $1.chars < @!w_fract_calc.AT-POS($col) {
-                                        $fract = $1 ~ ( ' ' x ( @!w_fract_calc.AT-POS($col) - $1.chars ) );
+                                    elsif $1.chars < @!w_fract_calc[$col] {
+                                        $fract = $1 ~ ( ' ' x ( @!w_fract_calc[$col] - $1.chars ) );
                                     }
                                     else {
                                         $fract = $1.Str;
                                     }
                                 }
                                 else {
-                                    $fract = ' ' x @!w_fract_calc.AT-POS($col);
+                                    $fract = ' ' x @!w_fract_calc[$col];
                                 }
                             }
                             $number = $0.defined ?? $0 ~ $fract !! $fract;
                         }
-                        if $number.chars > @!w_cols_calc.AT-POS($col) {
+                        if $number.chars > @!w_cols_calc[$col] {
                             my Int $signed_1_precision_w = $one_precision_w + ( $number.starts-with( '-' ) ?? 1 !! 0 );
                             my Int $precision;
-                            if @!w_cols_calc.AT-POS($col) < $signed_1_precision_w {
+                            if @!w_cols_calc[$col] < $signed_1_precision_w {
                                 # special treatment because zero precision has no dot
                                 $precision = 0;
                             }
                             else {
-                                $precision = @!w_cols_calc.AT-POS($col) - ( $signed_1_precision_w - 1 ); # -1 for the dot
+                                $precision = @!w_cols_calc[$col] - ( $signed_1_precision_w - 1 ); # -1 for the dot
                             }
                             $number = sprintf "%.*e", $precision, $number;
-                            if $number.chars > @!w_cols_calc.AT-POS($col) { # not enough space to print the number
-                                $str = $str ~ ( '-' x @!w_cols_calc.AT-POS($col) );
+                            if $number.chars > @!w_cols_calc[$col] { # not enough space to print the number
+                                $str ~= ( '-' x @!w_cols_calc[$col] );
                             }
-                            elsif $number.chars < @!w_cols_calc.AT-POS($col) { # @!w_cols_calc.AT-POS($col) == zero_precision_w + 1
-                                #$str = $str ~ ' ' ~ $number;
-                                $str = $str ~ $number ~ ' ';
+                            elsif $number.chars < @!w_cols_calc[$col] { # @!w_cols_calc[$col] == zero_precision_w + 1
+                                #$str ~= ' ' ~ $number;
+                                $str ~= $number ~ ' ';
                             }
                             else {
-                                $str = $str ~ $number;
+                                $str ~= $number;
                             }
                         }
-                        elsif $number.chars < @!w_cols_calc.AT-POS($col) {
-                            $str = $str ~ ' ' x ( @!w_cols_calc.AT-POS($col) - $number.chars ) ~ $number;
+                        elsif $number.chars < @!w_cols_calc[$col] {
+                            $str ~= ' ' x ( @!w_cols_calc[$col] - $number.chars ) ~ $number;
                         }
                         else {
-                            $str = $str ~ $number;
+                            $str ~= $number;
                         }
                     }
                     else {
-                        my Int $width = print-columns( @!tbl_copy.AT-POS($row).AT-POS($col), %cache );
-                        if $width > @!w_cols_calc.AT-POS($col) {
-                            $str = $str ~ to-printwidth( @!tbl_copy.AT-POS($row).AT-POS($col), @!w_cols_calc.AT-POS($col), False, %cache ).[0];
+                        my Int $width = print-columns( @!tbl_copy[$row][$col], %cache );
+                        if $width > @!w_cols_calc[$col] {
+                            $str ~= to-printwidth( @!tbl_copy[$row][$col], @!w_cols_calc[$col], False, %cache ).[0];
                         }
-                        elsif $width < @!w_cols_calc.AT-POS($col) {
-                            $str =  $str ~ @!tbl_copy.AT-POS($row).AT-POS($col) ~ ' ' x ( @!w_cols_calc.AT-POS($col) - $width );
+                        elsif $width < @!w_cols_calc[$col] {
+                            $str =  $str ~ @!tbl_copy[$row][$col] ~ ' ' x ( @!w_cols_calc[$col] - $width );
                         }
                         else {
-                            $str = $str ~ @!tbl_copy.AT-POS($row).AT-POS($col);
+                            $str ~= @!tbl_copy[$row][$col];
                         }
                     }
-                    if %!o<color> && @!tbl_orig.AT-POS($row).AT-POS($col).defined { #
-                        my Str @colors = @!tbl_orig.AT-POS($row).AT-POS($col).comb( &rx-color );
+                    if %!o<color> && @!tbl_orig[$row][$col].defined && @!tbl_orig[$row][$col] !~~ Buf {
+                        my Str @colors = @!tbl_orig[$row][$col].comb( &rx-color );
                         if @colors.elems {
                             $str.=subst( / $(ph-char) /, { @colors.shift }, :g );
                             $str ~= "\e[0m";
                         }
                     }
-                    if $col != @!w_cols_calc.end {
-                        $str = $str ~ $tab;
-                    }
+                    $str ~= $col == @!w_cols_calc.end ?? $lrb !! $tab;
                 }
-                if $step {                                       #
-                    $lock.protect( {                             #
-                        ++$count;                                #
-                        if $count %% $step {                     #
-                            self!_update_progress_bar( $count ); #
-                        }                                        #
-                    } );                                         #
+                if $show_pg {
+                    $lock.protect( {
+                        if ++$!p_bar<count> > $!p_bar<next_update> {
+                            self!_update_progress_bar();
+                        }
+                    } );
                 }
                 $row, $str;
             }
@@ -675,12 +674,12 @@ method !_table_row_to_string {
     my $tbl_print = [];
     for await @promise -> @portion {
         for @portion {
-            $tbl_print.BIND-POS( .[0], .[1] );
+            $tbl_print[.[0]] = .[1];
         }
     }
-    if $step {                                                   #
-        self!_last_update_progress_bar( $count );                #
-    }                                                            #
+    if $show_pg {
+        self!_update_progress_bar();
+    }
     return $tbl_print;
 }
 
@@ -766,72 +765,58 @@ method !_split_work_for_threads {
 }
 
 
-method !_init_progress_bar ( $times ) {
+method !_init_progress_bar ( Int $total ) {
     $!p_bar = {};
     my Int $count_cells = $!row_count * @!tbl_orig[0].elems;
     if %!o<progress-bar> && %!o<progress-bar> < $count_cells {
         print clear-screen();
         print 'Computing: ';
-        $!p_bar<count_progress_bars> = $times;
-        if $count_cells / %!o<progress-bar> > 50 {
-            $!p_bar<merge_progress_bars> = 0;
-            $!p_bar<total> = $!row_count;
-        }
-        else {
-            $!p_bar<merge_progress_bars> = 1;
-            $!p_bar<total> = $!row_count * $!p_bar<count_progress_bars>;
-        }
+        $!p_bar<total> = $total;
     }
 }
 
 
 method !_set_progress_bar {
-    if ! $!p_bar<count_progress_bars> {
-        return Int, Int;
+    if ! $!p_bar<total> {
+        return 0;
     }
     my Int $term_w = get-term-size().[0] + extra-w;
-    my Int $count;
-    if $!p_bar<merge_progress_bars> {
-        $!p_bar<fmt> = 'Computing: [%s%s]';
-        $count = $!p_bar<so_far> // 0;
-    }
-    else {
-        $!p_bar<fmt> = 'Computing: (' ~ $!p_bar<count_progress_bars> ~ ') [%s%s]';
-        $count = 0;
-    }
-    $!p_bar<count_progress_bars>--;
+    $!p_bar<fmt> = "\rComputing: %3d%% [%s]";
     if $term_w < 25 {
-        $!p_bar<fmt> = '[%s%s]';
-    }
-    $!p_bar<bar_w> = $term_w - ( sprintf $!p_bar<fmt>, '', '' ).chars - 1;
-    my Int $step = $!p_bar<total> div $!p_bar<bar_w> || 1;
-    return $count, $step;
-}
-
-
-method !_update_progress_bar( Int $count ) { # sub
-    my $multi = ( $count / ( $!p_bar{'total'} / $!p_bar<bar_w> ) ).ceiling;
-    print "\r" ~ sprintf( $!p_bar<fmt>, '=' x $multi, ' ' x $!p_bar<bar_w> - $multi );
-}
-
-
-method !_last_update_progress_bar( $count ) {
-    if $!p_bar<count_progress_bars> && $!p_bar<merge_progress_bars> {
-        $!p_bar<so_far> = $count;
+        $!p_bar<short_print> = 1;
+        $!p_bar<bar_w> = $term_w;
     }
     else {
-        self!_update_progress_bar( $!p_bar<total> );
+        $!p_bar<short_print> = 0;
+        $!p_bar<bar_w> = $term_w - ( sprintf $!p_bar<fmt>, 100, '' ).chars + 1; # +1: "\r".chars == 1
     }
-    print "\r";
+    $!p_bar<step> = ( $!p_bar<total> div $!p_bar<bar_w> ).floor || 1;
+    $!p_bar<count> //= 0;
+    $!p_bar<next_update> ||= $!p_bar<step>;
+    return 1;
 }
 
 
-method !_header_separator { 
-    my Str $header_sep = '';
+method !_update_progress_bar() {
+    my $multi = ( $!p_bar<count> / ( $!p_bar<total> / $!p_bar<bar_w> ) ).floor;
+    if $!p_bar<short_print> {
+        print "\r", clear-to-end-of-line();
+        print( ( '=' x $multi ) ~ ( ' ' x ( $!p_bar<bar_w> - $multi ) ) );
+    }
+    else {
+        printf( $!p_bar<fmt>, ( $!p_bar<count> / $!p_bar<total> * 100 ), ( '=' x $multi ) ~ ( ' ' x $!p_bar<bar_w> - $multi ) );
+    }
+    $!p_bar<next_update> += $!p_bar<step>;
+}
+
+
+method !_header_separator {
+    my Str $lrb = '-' x $!edge_w;
+    my Str $header_sep = $lrb;
     my Str $tab = ( '-' x $!tab_w div 2 ) ~ '|' ~ ( '-' x $!tab_w div 2 );
     for ^@!w_cols_calc {
         $header_sep ~= '-' x @!w_cols_calc[$_];
-        $header_sep ~= $tab if $_ != @!w_cols_calc.end;
+        $header_sep ~= $_ == @!w_cols_calc.end ?? $lrb !! $tab;
     }
     return $header_sep;
 }
@@ -849,8 +834,6 @@ method !_print_term_not_wide_enough_message {
 sub _minus_x_percent ( Int $value, Int $percent ) {
     ( $value - ( $value / 100 * $percent ) ).Int || 1;
 }
-
-
 
 
 
@@ -908,27 +891,27 @@ page.
 =item the K<Home> key (or K<Ctrl-A>) to jump to the first row of the table, the K<End> key (or K<Ctrl-E>) to jump to the
 last row of the table.
 
-If I<table-expand> is set to C<0>, the K<Return> key closes the table if the cursor is on the first row.
+If I<table-expand> is set to C<0>, the K<Enter> key closes the table if the cursor is on the first row.
 
-If I<table-expand> is enabled and the cursor is on the first row, pressing K<Return> three times in succession closes
-the table. If the cursor is auto-jumped to the first row, it is required only one K<Return> to close the table.
+If I<table-expand> is enabled and the cursor is on the first row, pressing K<Enter> three times in succession closes
+the table. If the cursor is auto-jumped to the first row, it is required only one K<Enter> to close the table.
 
 If the cursor is not on the first row:
 
-=item1 with the option I<table-expand> disabled the cursor jumps to the table head if K<Return> is pressed.
+=item1 with the option I<table-expand> disabled the cursor jumps to the table head if K<Enter> is pressed.
 
 =item1 with the option I<table-expand> enabled each column of the selected row is output in its own line preceded by the
-column name if K<Return> is pressed. Another K<Return> closes this output and goes back to the table output. If a row is
+column name if K<Enter> is pressed. Another K<Enter> closes this output and goes back to the table output. If a row is
 selected twice in succession, the pointer jumps to the first row.
 
 If the size of the window has changed, the screen is rewritten as soon as the user presses a key.
 
 K<Ctrl-F> opens a prompt. A regular expression is expected as input. This enables one to only display rows where at
-least one column matches the entered pattern. See option L</search>.
+least one column matches the entered pattern. See option L<#search>.
 
 =head2 Output
 
-If the option table-expand is enabled and a row is selected with K<Return>, each column of that row is output in its own
+If the option table-expand is enabled and a row is selected with K<Enter>, each column of that row is output in its own
 line preceded by the column name.
 
 If the table has more rows than the terminal, the table is divided up on as many pages as needed automatically. If the
@@ -956,7 +939,7 @@ If the terminal is too narrow to print the table, the columns are adjusted to th
 =item First, if the option I<trunc-fract-first> is enabled and if there are numbers that have a fraction, the fraction is
 truncated up to two decimal places.
 
-=item Then columns wider than I<min-col-width> are trimmed. See option L</min-col-width>.
+=item Then columns wider than I<min-col-width> are trimmed. See option L<#min-col-width>.
 
 =item If it is still required to lower the row width all columns are trimmed until they fit into the terminal.
 
@@ -1021,6 +1004,10 @@ C<REACHED LIMIT "MAX_ROWS": $limit> or C<=LIMIT= $limit> if the previous doesn't
 
 Default: 50_000
 
+=head2 max-width-exp
+
+Set a maximum width of the expanded table row output. (See option L<#table-expand>).
+
 =head2 min-col-width
 
 The columns with a width below or equal I<min-col-width> are only trimmed if it is still required to lower the row width
@@ -1033,6 +1020,14 @@ Default: 30
 Set the I<mouse> mode (see option C<mouse> in L<Term::Choose|https://github.com/kuerbis/Term-Choose-p6>).
 
 Default: 0
+
+=head2 pad-row-edges
+
+Add a space at the beginning and end of each row.
+
+0 - off (default)
+
+1 - enabled
 
 =head2 progress-bar
 
@@ -1073,12 +1068,10 @@ Default: 2
 
 =head2 table-expand
 
-If the option I<table-expand> is enabled and K<Return> is pressed, the selected table row is printed with each column in
-its own line. Exception: if the cursor auto-jumped to the first row, the first row will not be expanded.
-
-0 - off
-
-1 - on (default)
+If I<table-expand> is enabled and K<Enter> is pressed, the selected table row prints with each column on a new line.
+Pressing K<Enter> again closes this view. The next K<Enter> key press will automatically jump the cursor to the first
+row. If the cursor has automatically jumped to the first row, pressing K<Enter> will close the table instead of
+expanding the first row. Pressing any key other than K<Enter> resets these special behaviors.
 
 =begin code
 
@@ -1097,10 +1090,12 @@ its own line. Exception: if the cursor auto-jumped to the first row, the first r
 
 =end code
 
-If I<table-expand> is set to C<0>, the cursor jumps to the to first row (if not already there) when K<Return> is
+If I<table-expand> is set to C<0>, the cursor jumps to the to first row (if not already there) when K<Enter> is
 pressed.
 
-Default: 1
+0 - off
+
+1 - on (default)
 
 =head2 trunc-fract-first
 

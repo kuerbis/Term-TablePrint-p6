@@ -1,6 +1,13 @@
 Revision history for Term::TablePrint
 
 
+1.6.5  2025-05-14
+        - Bugfix buffer stringification. 
+        - Bugfix auto-up.
+        - Update progress bar.
+        - Code refactoring.
+        - New options 'max-width-exp' and 'pad-row-edges'.
+
 1.6.4  2025-03-29
         - Update 'line-fold'.
         - Term::Choose minimum version 1.9.6.

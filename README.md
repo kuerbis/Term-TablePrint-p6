@@ -45,24 +45,24 @@ Keys to move around:
 
   * the Home key (or Ctrl-A) to jump to the first row of the table, the End key (or Ctrl-E) to jump to the last row of the table.
 
-If *table-expand* is set to `0`, the Return key closes the table if the cursor is on the first row.
+If *table-expand* is set to `0`, the Enter key closes the table if the cursor is on the first row.
 
-If *table-expand* is enabled and the cursor is on the first row, pressing Return three times in succession closes the table. If the cursor is auto-jumped to the first row, it is required only one Return to close the table.
+If *table-expand* is enabled and the cursor is on the first row, pressing Enter three times in succession closes the table. If the cursor is auto-jumped to the first row, it is required only one Enter to close the table.
 
 If the cursor is not on the first row:
 
-  * with the option *table-expand* disabled the cursor jumps to the table head if Return is pressed.
+  * with the option *table-expand* disabled the cursor jumps to the table head if Enter is pressed.
 
-  * with the option *table-expand* enabled each column of the selected row is output in its own line preceded by the column name if Return is pressed. Another Return closes this output and goes back to the table output. If a row is selected twice in succession, the pointer jumps to the first row.
+  * with the option *table-expand* enabled each column of the selected row is output in its own line preceded by the column name if Enter is pressed. Another Enter closes this output and goes back to the table output. If a row is selected twice in succession, the pointer jumps to the first row.
 
 If the size of the window has changed, the screen is rewritten as soon as the user presses a key.
 
-Ctrl-F opens a prompt. A regular expression is expected as input. This enables one to only display rows where at least one column matches the entered pattern. See option [/search](/search).
+Ctrl-F opens a prompt. A regular expression is expected as input. This enables one to only display rows where at least one column matches the entered pattern. See option [search](#search).
 
 Output
 ------
 
-If the option table-expand is enabled and a row is selected with Return, each column of that row is output in its own line preceded by the column name.
+If the option table-expand is enabled and a row is selected with Enter, each column of that row is output in its own line preceded by the column name.
 
 If the table has more rows than the terminal, the table is divided up on as many pages as needed automatically. If the cursor reaches the end of a page, the next page is shown automatically until the last page is reached. Also if the cursor reaches the topmost line, the previous page is shown automatically if it is not already the first page.
 
@@ -84,7 +84,7 @@ If the terminal is too narrow to print the table, the columns are adjusted to th
 
   * First, if the option *trunc-fract-first* is enabled and if there are numbers that have a fraction, the fraction is truncated up to two decimal places.
 
-  * Then columns wider than *min-col-width* are trimmed. See option [/min-col-width](/min-col-width).
+  * Then columns wider than *min-col-width* are trimmed. See option [min-col-width](#min-col-width).
 
   * If it is still required to lower the row width all columns are trimmed until they fit into the terminal.
 
@@ -153,6 +153,11 @@ If the number of table rows is equal to or higher than *max-rows*, the last row 
 
 Default: 50_000
 
+max-width-exp
+-------------
+
+Set a maximum width of the expanded table row output. (See option [table-expand](#table-expand)).
+
 min-col-width
 -------------
 
@@ -166,6 +171,15 @@ mouse
 Set the *mouse* mode (see option `mouse` in [Term::Choose](https://github.com/kuerbis/Term-Choose-p6)).
 
 Default: 0
+
+pad-row-edges
+-------------
+
+Add a space at the beginning and end of each row.
+
+0 - off (default)
+
+1 - enabled
 
 progress-bar
 ------------
@@ -209,11 +223,7 @@ Default: 2
 table-expand
 ------------
 
-If the option *table-expand* is enabled and Return is pressed, the selected table row is printed with each column in its own line. Exception: if the cursor auto-jumped to the first row, the first row will not be expanded.
-
-0 - off
-
-1 - on (default)
+If *table-expand* is enabled and Enter is pressed, the selected table row prints with each column on a new line. Pressing Enter again closes this view. The next Enter key press will automatically jump the cursor to the first row. If the cursor has automatically jumped to the first row, pressing Enter will close the table instead of expanding the first row. Pressing any key other than Enter resets these special behaviors.
 
         .----------------------------.        .----------------------------.
         |col1 | col2   | col3 | col3 |        |                            |
@@ -228,9 +238,11 @@ If the option *table-expand* is enabled and Return is pressed, the selected tabl
         |.... | ...... | .... | .... |        |                            |
         '----------------------------'        '----------------------------'
 
-If *table-expand* is set to `0`, the cursor jumps to the to first row (if not already there) when Return is pressed.
+If *table-expand* is set to `0`, the cursor jumps to the to first row (if not already there) when Enter is pressed.
 
-Default: 1
+0 - off
+
+1 - on (default)
 
 trunc-fract-first
 -----------------
