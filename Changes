@@ -1,6 +1,9 @@
 Revision history for Term::TablePrint
 
 
+1.6.6  2025-09-26
+        - Unicode 17.
+
 1.6.5  2025-05-14
         - Bugfix buffer stringification. 
         - Bugfix auto-up.

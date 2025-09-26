@@ -3,7 +3,7 @@
   "build-depends": [
   ],
   "depends": [
-    "Term::Choose:ver<1.9.6+>",
+    "Term::Choose:ver<1.9.8+>",
     "Term::Choose::Util:ver<1.4.6+>"
   ],
   "description": "Print a table to the terminal and browse it interactively.",
@@ -15,7 +15,7 @@
   },
   "resources": [
   ],
-  "source-url": "git://github.com/kuerbis/Term-TablePrint-p6.git",
+  "source-url": "https://github.com/kuerbis/Term-TablePrint-p6.git",
   "tags": [
     "cli",
     "table",
@@ -25,5 +25,5 @@
   "test-depends": [
     "Test"
   ],
-  "version": "1.6.5"
+  "version": "1.6.6"
 }

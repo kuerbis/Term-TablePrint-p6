@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.6.5>;
+unit class Term::TablePrint:ver<1.6.6>;
 
 use Term::Choose;
 use Term::Choose::Constant;
