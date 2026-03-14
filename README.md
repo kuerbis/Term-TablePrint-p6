@@ -84,7 +84,7 @@ If the terminal is too narrow to print the table, the columns are adjusted to th
 
   * First, if the option *trunc-fract-first* is enabled and if there are numbers that have a fraction, the fraction is truncated up to two decimal places.
 
-  * Then columns wider than *min-col-width* are trimmed. See option [min-col-width](#min-col-width).
+  * Then columns wider than *col-trim-threshold* are trimmed. See option [col-trim-threshold](#col-trim-threshold).
 
   * If it is still required to lower the row width all columns are trimmed until they fit into the terminal.
 
@@ -112,10 +112,49 @@ OPTIONS
 
 Defaults may change in future releases.
 
-prompt
-------
+binary-filter
+-------------
 
-String displayed above the table.
+How to print arbitrary binary data:
+
+0 - Print the binary data as it is.
+
+1 - "BNRY" is printed instead of the binary data.
+
+2 - The binary data is printed in hexadecimal format.
+
+If the substring of the first 100 characters of the data matches the repexp `/<[\x00..\x08\x0B..\x0C\x0E..\x1F]>/`, the data is considered arbitrary binary data.
+
+Printing unfiltered arbitrary binary data could break the output.
+
+Default: 0
+
+choose-columns
+--------------
+
+Controls whether the user can choose which columns to display.
+
+0 - Disabled
+
+The user is never prompted to select columns.
+
+1 - Always
+
+The user is always prompted to select which columns to display.
+
+In this mode, `print_table` runs in an internal loop: after the table is displayed, the user is returned to the column selection screen. This allows for iterative viewing until the user exits by selecting the `" << "` (Back) menu entry.
+
+If the chosen columns exceed the terminal width, `print_table` falls back to the behavior described in item 2 (treating the chosen columns as the new "full" set).
+
+2 - Smart
+
+The user is prompted to select columns only if the table is too wide for the current terminal.
+
+Even if columns are hidden in the multi-row view:
+
+- The single-row view still displays all columns.
+
+- Searching with `Ctrl-F` scans all columns, including hidden ones.
 
 color
 -----
@@ -128,6 +167,11 @@ If this option is enabled, SRG ANSI escape sequences can be used to color the sc
 
 2 - on (current selected element colored)
 
+col-trim-threshold
+------------------
+
+The columns with a width below or equal *col-trim-threshold* are only trimmed, if it is still required to lower the row width despite all columns wider than *col-width-treshold* have been trimmed to *col-trim-threshold*.
+
 decimal-separator
 -----------------
 
@@ -136,6 +180,20 @@ If set, numbers use *decimal-separator* as the decimal separator instead of the 
 Allowed values: a character with a print width of `1`. If an invalid values is passed, *decimal-separator* falls back to the default value.
 
 Default: . (dot)
+
+expanded-line-spacing
+---------------------
+
+0 - Disabled
+
+1 - Insert a blank line between columns when a row is expanded.
+
+Default: 1
+
+expanded-max-width
+------------------
+
+Set a maximum width of the expanded table row output. (See option [table-expand](#table-expand)).
 
 footer
 ------
@@ -156,14 +214,12 @@ Default: 50_000
 max-width-exp
 -------------
 
-Set a maximum width of the expanded table row output. (See option [table-expand](#table-expand)).
+This option has been renamed to [expanded-max-width](#expanded-max-width).
 
 min-col-width
 -------------
 
-The columns with a width below or equal *min-col-width* are only trimmed if it is still required to lower the row width despite all columns wider than *min-col-width* have been trimmed to *min-col-width*.
-
-Default: 30
+This options has been renamed to [col-trim-threshold](#col-trim-threshold).
 
 mouse
 -----
@@ -187,6 +243,11 @@ progress-bar
 Set the progress bar threshold. If the number of fields (rows x columns) is higher than the threshold, a progress bar is shown while preparing the data for the output. Setting the value to `0` disables the progress bar.
 
 Default: 5_000
+
+prompt
+------
+
+String displayed above the table.
 
 save-screen
 -----------
@@ -213,13 +274,6 @@ If *squash-spaces* is enabled, consecutive spaces are squashed to one space and 
 
 Default: 0
 
-tab-width
----------
-
-Set the number of spaces between columns. If *format* is set to `2` and *tab-width* is even, the spaces between the columns are *tab-width* + 1 print columns.
-
-Default: 2
-
 table-expand
 ------------
 
@@ -243,6 +297,13 @@ If *table-expand* is set to `0`, the cursor jumps to the to first row (if not al
 0 - off
 
 1 - on (default)
+
+tab-width
+---------
+
+Set the number of spaces between columns. If *format* is set to `2` and *tab-width* is even, the spaces between the columns are *tab-width* + 1 print columns.
+
+Default: 2
 
 trunc-fract-first
 -----------------
@@ -301,7 +362,7 @@ Matthäus Kiem <cuer2s@gmail.com>
 LICENSE AND COPYRIGHT
 =====================
 
-Copyright 2016-2025 Matthäus Kiem.
+Copyright 2016-2026 Matthäus Kiem.
 
 This library is free software; you can redistribute it and/or modify it under the Artistic License 2.0.
 

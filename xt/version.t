@@ -14,7 +14,7 @@ for $meta-file.IO.lines -> $line {
 }
 
 
-my $pm-file = 'lib/Term/TablePrint.pm6';
+my $pm-file = 'lib/Term/TablePrint.rakumod';
 my $version-pm;
 
 for $pm-file.IO.lines -> $line {

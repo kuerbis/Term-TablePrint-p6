@@ -1,33 +1,37 @@
 use v6;
-unit class Term::TablePrint:ver<1.6.6>;
+unit class Term::TablePrint:ver<1.6.7>;
 
 use Term::Choose;
 use Term::Choose::Constant;
 use Term::Choose::LineFold;
 use Term::Choose::Screen;
-use Term::Choose::Util :insert-sep;
+use Term::Choose::Util :insert-sep, :choose-a-subset;
 
 has %!o;
 
-has UInt       $.max-rows          = 0;
-has UInt       $.max-width-exp     = 0;
-has UInt       $.min-col-width     = 30;
-has UInt       $.progress-bar      = 5_000;
-has UInt       $.tab-width         = 2;
-has Int_0_or_1 $.loop              = 0; # private
-has Int_0_or_1 $.mouse             = 0;
-has Int_0_or_1 $.pad-row-edges     = 0;
-has Int_0_or_1 $.save-screen       = 0;
-has Int_0_or_1 $.squash-spaces     = 0;
-has Int_0_or_1 $.table-expand      = 1;
-has Int_0_or_1 $.trunc-fract-first = 1;
-has Int_0_to_2 $.binary-filter     = 0;
-has Int_0_to_2 $.color             = 0;
-has Int_0_to_2 $.search            = 1;
-has Str        $.decimal-separator = '.';
-has Str        $.footer            = '';
-has Str        $.prompt            = '';
-has Str        $.undef             = '';
+has UInt       $.col-trim-threshold    = 30;
+has UInt       $.expanded-max-width    = 0;
+has UInt       $.max-rows              = 0;
+has UInt       $.max-width-exp         = 0;  # removed # now $.expanded-max-width # 13.03.2026
+has UInt       $.min-col-width         = 30; # removed # now $.col-trim-threshold # 13.03.2026
+has UInt       $.progress-bar          = 5_000;
+has UInt       $.tab-width             = 2;
+has Int_0_or_1 $.expanded-line-spacing = 1;
+has Int_0_or_1 $.loop                  = 0; # private
+has Int_0_or_1 $.mouse                 = 0;
+has Int_0_or_1 $.pad-row-edges         = 0;
+has Int_0_or_1 $.save-screen           = 0;
+has Int_0_or_1 $.squash-spaces         = 0;
+has Int_0_or_1 $.table-expand          = 1;
+has Int_0_or_1 $.trunc-fract-first     = 1;
+has Int_0_to_2 $.binary-filter         = 0;
+has Int_0_to_2 $.choose-columns        = 0;
+has Int_0_to_2 $.color                 = 0;
+has Int_0_to_2 $.search                = 1;
+has Str        $.decimal-separator     = '.';
+has Str        $.footer                = '';
+has Str        $.prompt                = '';
+has Str        $.undef                 = '';
 
 has     @!tbl_orig;
 has     @!tbl_copy;
@@ -42,12 +46,15 @@ has Array @!portions;
 
 has Str $!filter_string = '';
 has Int @!map_indexes;
-has     %!map_return_wr_table = :0last, :1window_width_changed, :2enter_search_string, :3returned_from_filtered_table;
+has     %!wr_table = :0last, :1window_width_changed, :2enter_search_string, :3returned_from_filtered_table, :4choose_and_print;
+
+has Array $!used_cols_tbl_orig;
+has Array $!desired_cols_tbl_orig;
 
 has Int  $!row_count;
 has Int  $!tab_w;
-has Int $!edge_w = 0;
-has Str $!binary-string = 'BNRY';
+has Int  $!edge_w = 0;
+has Str  $!binary-string = 'BNRY';
 has Str  $!info_row;
 has Str  $!thsd_sep = ',';
 has Hash $!p_bar;
@@ -61,7 +68,7 @@ method !_init_term {
     if %!o<save-screen> {
         print save-screen;
     }
-    $!tc = Term::Choose.new( :mouse( %!o<mouse> ), :0hide-cursor, :1clear-screen ); # c-s 
+    $!tc = Term::Choose.new( :mouse( %!o<mouse> ), :1hide-cursor, :1clear-screen ); # c-s
 }
 
 
@@ -82,31 +89,33 @@ sub print-table ( @orig_table, *%opt ) is export( :DEFAULT, :print-table ) {
 
 method print-table (
         @!tbl_orig,
-        UInt       :$max-rows          = $!max-rows,
-        UInt       :$max-width-exp     = $!max-width-exp,
-        UInt       :$min-col-width     = $!min-col-width,
-        UInt       :$progress-bar      = $!progress-bar,
-        UInt       :$tab-width         = $!tab-width,
-        Int_0_or_1 :$mouse             = $!mouse,
-        Int_0_or_1 :$pad-row-edges     = $!pad-row-edges,
-        Int_0_or_1 :$save-screen       = $!save-screen,
-        Int_0_or_1 :$squash-spaces     = $!squash-spaces,
-        Int_0_or_1 :$table-expand      = $!table-expand,
-        Int_0_or_1 :$trunc-fract-first = $!trunc-fract-first,
-        Int_0_to_2 :$binary-filter     = $!binary-filter;
-        Int_0_to_2 :$color             = $!color,
-        Int_0_to_2 :$search            = $!search,
-        Str        :$decimal-separator = $!decimal-separator,
-        Str        :$footer            = $!footer,
-        Str        :$prompt            = $!prompt,
-        Str        :$undef             = $!undef,
+        UInt       :$col-trim-threshold    = $!col-trim-threshold,
+        UInt       :$expanded-max-width    = $!expanded-max-width,
+        UInt       :$max-rows              = $!max-rows,
+        UInt       :$progress-bar          = $!progress-bar,
+        UInt       :$tab-width             = $!tab-width,
+        Int_0_or_1 :$expanded-line-spacing = $!expanded-line-spacing,
+        Int_0_or_1 :$mouse                 = $!mouse,
+        Int_0_or_1 :$pad-row-edges         = $!pad-row-edges,
+        Int_0_or_1 :$save-screen           = $!save-screen,
+        Int_0_or_1 :$squash-spaces         = $!squash-spaces,
+        Int_0_or_1 :$table-expand          = $!table-expand,
+        Int_0_or_1 :$trunc-fract-first     = $!trunc-fract-first,
+        Int_0_to_2 :$binary-filter         = $!binary-filter;
+        Int_0_to_2 :$choose-columns        = $!choose-columns,
+        Int_0_to_2 :$color                 = $!color,
+        Int_0_to_2 :$search                = $!search,
+        Str        :$decimal-separator     = $!decimal-separator,
+        Str        :$footer                = $!footer,
+        Str        :$prompt                = $!prompt,
+        Str        :$undef                 = $!undef,
     ) {
-    %!o = :$max-rows, :$max-width-exp, :$min-col-width, :$progress-bar, :$tab-width, :$mouse, :$pad-row-edges,
-          :$save-screen, :$squash-spaces, :$binary-filter, :$color, :$search, :$table-expand, :$decimal-separator,
-          :$footer, :$prompt, :$undef, :$trunc-fract-first;
+    %!o = :$binary-filter, :$choose-columns, :$color, :$col-trim-threshold, :$decimal-separator, :$expanded-line-spacing,
+          :$expanded-max-width, :$footer, :$max-rows, :$mouse, :$pad-row-edges, :$progress-bar, :$prompt, :$save-screen,
+          :$search, :$squash-spaces, :$table-expand, :$tab-width, :$trunc-fract-first, :$undef;
     self!_init_term();
     if ! @!tbl_orig.elems {
-        $!tc.pause( ( 'Close with ENTER', ), :prompt( '"print-table": Empty table!' ) );
+        $!tc.pause( ( 'Close with ENTER', ), :prompt( '"print-table": Empty table without header row!' ) );
         self!_end_term;
         return;
     }
@@ -129,27 +138,39 @@ method print-table (
         $!edge_w = 1;
     }
     self!_row_count( @!tbl_orig.elems );
-    self!_init_progress_bar( $!row_count * 3 - 1 );
     self!_split_work_for_threads();
-    self!_copy_table();
-    self!_calc_col_width();
-    my ( Int $term_w, Int $table_w, Array $tbl_print, Array $header );
+    my Int $next;
+    my ( Int $term_w, Array $tbl_print, Int $table_w, Str $header ) = self!_get_data( $next );
+    if ! $term_w.defined {
+        self!_end_term();
+        return;
+    }
 
-    loop {
-        my Int $next = self!_write_table( $term_w, $table_w, $tbl_print, $header );
-        if $next == %!map_return_wr_table<last> {
-            last;
+    WRITE-TABLE: loop {
+        $next = self!_write_table( $term_w, $table_w, $tbl_print, $header );
+        if ! $next.defined {
+            die;
         }
-        elsif $next == %!map_return_wr_table<window_width_changed> {
+        if $next == %!wr_table<last> {
+            last WRITE-TABLE;
         }
-        elsif $next == %!map_return_wr_table<enter_search_string> {
+        elsif $next == %!wr_table<window_width_changed> || $next == %!wr_table<choose_and_print> {
+            ( $term_w, $tbl_print, $table_w, $header ) = self!_get_data( $next );
+            if ! $term_w.defined {
+                self!_end_term();
+                return;
+            }
+            next WRITE-TABLE;
+        }
+        elsif $next == %!wr_table<enter_search_string> {
             self!_search();
+            next WRITE-TABLE;
         }
-        elsif $next == %!map_return_wr_table<returned_from_filtered_table> {
+        elsif $next == %!wr_table<returned_from_filtered_table> {
             self!_reset_search();
+            next WRITE-TABLE;
         }
         self!_init_progress_bar( $!row_count );
-        next;
     }
     self!_end_term();
     return;
@@ -157,37 +178,17 @@ method print-table (
 
 
 method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header is rw ) {
-    if ! $term_w || $term_w != get-term-size().[0] + extra-w {
-        $term_w = get-term-size().[0] + extra-w;
-        my $ok = self!_calc_avail_col_width( $term_w );
-        if ! $ok {
-            return %!map_return_wr_table<last>;
-        }
-        $table_w = [+] |@!w_cols_calc, $!tab_w * @!w_cols_calc.end, 2 * $!edge_w;
-        if ! $table_w {
-            return %!map_return_wr_table<last>;
-        }
-        $tbl_print = self!_table_row_to_string();
-        $header = [];
-        if %!o<prompt>.chars {
-            $header.push: %!o<prompt>;
-        }
-        my Str $col_names = $tbl_print.shift;
-        $header.push: $col_names, self!_header_separator();
-        if $!info_row {
-            if print-columns( $!info_row ) > $table_w {
-                $tbl_print.push: to-printwidth( $!info_row, $table_w - 3 ).[0] ~ '...';
-            }
-            else {
-                $tbl_print.push: $!info_row ~ ' ' x ( $table_w - $!info_row.chars ); #
-            }
-        }
-    }
-    my Int $return = %!map_return_wr_table<last>;
     my Int @idxs_tbl_print;
+    my Int $return;
     if $!filter_string.chars {
         @idxs_tbl_print = @!map_indexes.map: { $_ - 1 }; # because of the removed header row from $tbl_print
-        $return = %!map_return_wr_table<returned_from_filtered_table>;
+        $return = %!wr_table<returned_from_filtered_table>;
+    }
+    elsif %!o<choose-columns> == 1 {
+        $return = %!wr_table<choose_and_print>;
+    }
+    else {
+        $return = %!wr_table<last>;
     }
     my Str $footer = '';
     if %!o<footer> {
@@ -201,19 +202,17 @@ method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header 
     my Int $row_was_expanded = 0;
 
     loop {
-        if $term_w != get-term-size().[0] + extra-w {
-            return %!map_return_wr_table<window_width_changed>;
+        if $term_w != term_width() {
+            return %!wr_table<window_width_changed>;
         }
-        if ( $!row_count <= 1 ) {
-            # Choose
-            $!tc.pause( ( 'Empty table!', ), :prompt( $header.join: "\n" ), :0layout );
-            return %!map_return_wr_table<last>;
+        if $!row_count <= 1 { # only header
+            $tbl_print.push: '';
         }
         %*ENV<TC_RESET_AUTO_UP> = 0;
         # Choose
         my Int $row = $!tc.choose(
             @idxs_tbl_print.elems ?? $tbl_print[@idxs_tbl_print] !! $tbl_print,
-            :prompt( $header.join: "\n" ), :ll( $table_w ), :default( $old_row ), :1index, :2layout,
+            :prompt( $header ), :ll( $table_w ), :default( $old_row ), :1index, :2layout,
             :color( %!o<color> ), :$footer
         );
         if ! $row.defined {
@@ -221,16 +220,16 @@ method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header 
         }
         if $row < 0 {
             if $row == -1 {         # with option `ll` set and changed window width `choose` returns -1;
-                return %!map_return_wr_table<window_width_changed>;
+                return %!wr_table<window_width_changed>;
             }
             elsif $row == -13 {     # `choose` returns -13 if `F3` was pressed
                 if $!filter_string.chars {
                     self!_reset_search();
                 }
-                return %!map_return_wr_table<enter_search_string>;
+                return %!wr_table<enter_search_string>;
             }
             else {
-                return %!map_return_wr_table<last>;
+                return %!wr_table<last>;
             }
         }
         if ! %!o<table-expand> {
@@ -272,10 +271,115 @@ method !_write_table ( $term_w is rw, $table_w is rw, $tbl_print is rw, $header 
 }
 
 
+sub term_width { return get-term-size().[0] + extra-w }
+
+
+method !_used_columns ( Int $next? ) {
+    my $tcu = Term::Choose::Util.new(
+        :1index, :1all-by-default, :1keep-chosen, :cs-begin( "\n" ), :confirm( '-OK_' ), :back( ' << ' )
+    );
+    my Int @cols;
+    if $next.defined && $next == %!wr_table<window_width_changed> {
+        @cols = |$!desired_cols_tbl_orig;
+    }
+    elsif %!o<choose-columns> == 1 {
+        # Choose
+        @cols = $tcu.choose-a-subset( @!tbl_orig[0], :cs-label( 'Chosen columns:' ) );
+        if ! @cols {
+            return;
+        }
+    }
+    else {
+        @cols = ( ^@!tbl_orig[0] );
+    }
+    my Int $min_col_w_th = %!o<choose-columns> ?? 3 !! 2; # min_col_width_treshold
+    my Int @desired_cols;
+    my Int $term_w = term_width();
+
+    while ( ( $!tab_w + $min_col_w_th ) * @cols.end + $min_col_w_th + $!edge_w * 2 > $term_w ) {
+        $!tab_w -= 2;
+        if $!tab_w < 1 {
+            if %!o<choose-columns> {
+                if ! @desired_cols {
+                    @desired_cols = @cols;
+                }
+                $!tab_w = %!o<tab-width>;
+                if ! ( %!o<tab-width> % 2 ) {
+                     ++$!tab_w;
+                }
+                my Int $avail_w = $term_w - ( $!edge_w * 2 + $min_col_w_th );
+                my Int $max_cols = 1 + ( $avail_w / ( 1 + $min_col_w_th ) ).Int;
+                my Str $cs-label = "Current window width only supports $max_cols columns.";
+                $cs-label ~= "\nPlease reduce your selection or widen the terminal:";
+                # Choose
+                my @new_cols = $tcu.choose-a-subset( @!tbl_orig[0][@cols], :$cs-label );
+                if ! @new_cols {
+                    return;
+                }
+                $term_w = term_width();
+                @cols = @cols[@new_cols];
+            }
+            else {
+                my Str $info = 'Too many columns; the terminal window is not wide enough.';
+                my Str $prompt = 'Close with ENTER.';
+                $!tc.pause( @!tbl_orig[0], :$prompt, :$info, :1clear-screen, :0hide-cursor, :mouse( $!mouse ) );
+                return;
+            }
+        }
+    }
+    if ! @desired_cols {
+        @desired_cols = @cols;
+    }
+    return $term_w, @desired_cols, @cols;
+}
+
+
+method !_get_data ( Int $next? ) {
+    $!tab_w = %!o<tab-width>;
+    if ! ( %!o<tab-width> % 2 ) {
+            ++$!tab_w;
+    }
+    my ( Int $term_w, Array $desired_cols, Array $possible_cols ) = self!_used_columns( $next );
+    if ! $term_w {
+        return;
+    }
+    $!used_cols_tbl_orig = $possible_cols;
+    $!desired_cols_tbl_orig = $desired_cols;
+    self!_init_progress_bar( $!row_count * 3 - 1 );
+    self!_copy_table();
+    self!_calc_col_width();
+    my $ok = self!_calc_avail_col_width( $term_w );
+    if ! $ok {
+        return;
+    }
+    my Int $table_w = [+] |@!w_cols_calc, $!tab_w * @!w_cols_calc.end, 2 * $!edge_w;
+    if ! $table_w {
+        return;
+    }
+    my $tbl_print = self!_table_row_to_string();
+    my $header_rows = [];
+    if %!o<prompt>.chars {
+        $header_rows.push: %!o<prompt>;
+    }
+    my Str $col_names = $tbl_print.shift;
+    $header_rows.push: $col_names, self!_header_separator();
+    my Str $header = $header_rows.join: "\n";
+    if $!info_row {
+        if print-columns( $!info_row ) > $table_w {
+            $tbl_print.push: to-printwidth( $!info_row, $table_w - 3 ).[0] ~ '...';
+        }
+        else {
+            $tbl_print.push: $!info_row ~ ' ' x ( $table_w - $!info_row.chars ); #
+        }
+    }
+    return $term_w, $tbl_print, $table_w, $header;
+}
+
+
 method !_print_single_table_row ( Int $row, Str $footer, Int $search ) {
     my Int $avail_w = get-term-size().[0];
-    if %!o<max-width-exp> && %!o<max-width-exp> < $avail_w {
-        $avail_w = %!o<max-width-exp>;
+    if %!o<expanded-max-width> && %!o<expanded-max-width> < $avail_w {
+        $avail_w = %!o<expanded-max-width>;
     }
     my Int $max_key_w = @!w_heads.max + 1; #
     if $max_key_w > $avail_w div 3 {
@@ -284,9 +388,12 @@ method !_print_single_table_row ( Int $row, Str $footer, Int $search ) {
     my Str $separator = ' : ';
     my Int $sep_w = $separator.chars;
     my Int $max_value_w = $avail_w - ( $max_key_w + $sep_w );
-    my Str @lines = ' Close with ENTER', ' ';
+    my Str @lines = ' Close with ENTER';
 
-    for ^@!tbl_orig[0] -> $col {
+    for |$!desired_cols_tbl_orig -> $col {
+        if %!o<expanded-line-spacing> {
+            @lines.push: ' ';
+        }
         my $key = ( @!tbl_orig[0][$col] // %!o<undef> );
         if $key ~~ Buf {
             $key = $key.raku; ##
@@ -310,7 +417,7 @@ method !_print_single_table_row ( Int $row, Str $footer, Int $search ) {
         }
         my Int $key_w = print-columns( $key );
         if $key_w > $max_key_w {
-            $key = to-printwidth( $key, $max_key_w );
+            $key = to-printwidth( $key, $max_key_w ).[0];
         }
         elsif $key_w < $max_key_w { # >
             $key = ( ' ' x ( $max_key_w - $key_w ) ) ~ $key;
@@ -321,7 +428,7 @@ method !_print_single_table_row ( Int $row, Str $footer, Int $search ) {
                 $key.=subst( / $(ph-char) /, { @colors.shift }, :g );
             }
         }
-        my $value = @!tbl_orig[$row][$col] // $!undef;
+        my $value = @!tbl_orig[$row][$col] // %!o<undef>;
         if $value ~~ Buf {
             $value = $value.raku;
         }
@@ -336,9 +443,7 @@ method !_print_single_table_row ( Int $row, Str $footer, Int $search ) {
                 @lines.push: $subseq_tab ~ $line;
             }
         }
-        @lines.push: ' ';
     }
-    @lines.pop;
     $!tc.pause( @lines, :prompt( '' ), :2layout, :$footer, :$search, :color( %!o<color> ) );
 }
 
@@ -357,7 +462,7 @@ method !_copy_table {
                         }
                     } );
                 }
-                do for ^@!tbl_orig[0] -> $col {
+                do for |$!used_cols_tbl_orig -> $col {
                     my $str = ( @!tbl_orig[$row][$col] // %!o<undef> );  # this is where the copying happens
                     if $str ~~ Buf {
                         $str = $str.raku; ##
@@ -478,14 +583,9 @@ method !_calc_avail_col_width( $term_w ) {
         }
     }
     elsif $sum > $avail_w {
-
-        if @!w_heads.elems > $avail_w { ##
-            self!_print_term_not_wide_enough_message();
-            return;
-        }
         if %!o<trunc-fract-first> {
 
-            TRUNC_FRACT: while $sum > $avail_w {
+            TRUNC-FRACT: while $sum > $avail_w {
                 my Int $prev_sum = $sum;
                 for ^@!w_cols_calc -> $col {
                     if @!w_fract_calc[$col] && @!w_fract_calc[$col] > 3 {
@@ -494,19 +594,19 @@ method !_calc_avail_col_width( $term_w ) {
                         --@!w_cols_calc[$col];
                         --$sum;
                         if $sum == $avail_w {
-                            last TRUNC_FRACT;
+                            last TRUNC-FRACT;
                         }
                     }
                 }
                 if $sum == $prev_sum {
-                    last TRUNC_FRACT;
+                    last TRUNC-FRACT;
                 }
             }
         }
-        my Int $min_col_w = %!o<min-col-width> < 2 ?? 2 !! %!o<min-col-width>;
+        my Int $min_col_w = %!o<col-trim-threshold> < 2 ?? 2 !! %!o<col-trim-threshold>;
         my Int $percent = 0;
 
-        TRUNC_COLS: while $sum > $avail_w {
+        TRUNC-COLS: while $sum > $avail_w {
             ++$percent;
             for ^@!w_cols_calc -> $col {
                 if @!w_cols_calc[$col] > $min_col_w {
@@ -527,28 +627,27 @@ method !_calc_avail_col_width( $term_w ) {
             $sum = @!w_cols_calc.sum;
             if $sum == $prev_sum {
                 --$min_col_w;
-                if $min_col_w < 2 { # a character could have a print width of 2
-                    self!_print_term_not_wide_enough_message();
-                    return;
+                if $min_col_w < 1 {
+                    die "Value less than 1";
                 }
             }
         }
         my Int $remainder_w = $avail_w - $sum;
         if $remainder_w {
 
-            REMAINDER_W: loop {
+            REMAINDER-W: loop {
                 my Int $prev_remainder_w = $remainder_w;
                 for ^@!w_cols_calc -> $col {
                     if @!w_cols_calc[$col] < @!w_cols[$col] {
                         @!w_cols_calc[$col] = @!w_cols_calc[$col] + 1;
                         --$remainder_w;
                         if $remainder_w == 0 {
-                            last REMAINDER_W;
+                            last REMAINDER-W;
                         }
                     }
                 }
                 if $remainder_w == $prev_remainder_w {
-                    last REMAINDER_W;
+                    last REMAINDER-W;
                 }
             }
         }
@@ -597,7 +696,7 @@ method !_table_row_to_string {
                                     if $1.chars > @!w_fract_calc[$col] {
                                         $fract = $1.substr( 0, @!w_fract_calc[$col] );
                                     }
-                                    elsif $1.chars < @!w_fract_calc[$col] {
+                                    elsif $1.chars < @!w_fract_calc[$col] { # >
                                         $fract = $1 ~ ( ' ' x ( @!w_fract_calc[$col] - $1.chars ) );
                                     }
                                     else {
@@ -624,7 +723,7 @@ method !_table_row_to_string {
                             if $number.chars > @!w_cols_calc[$col] { # not enough space to print the number
                                 $str ~= ( '-' x @!w_cols_calc[$col] );
                             }
-                            elsif $number.chars < @!w_cols_calc[$col] { # @!w_cols_calc[$col] == zero_precision_w + 1
+                            elsif $number.chars < @!w_cols_calc[$col] { # @!w_cols_calc[$col] == zero_precision_w + 1 # >
                                 #$str ~= ' ' ~ $number;
                                 $str ~= $number ~ ' ';
                             }
@@ -632,7 +731,7 @@ method !_table_row_to_string {
                                 $str ~= $number;
                             }
                         }
-                        elsif $number.chars < @!w_cols_calc[$col] {
+                        elsif $number.chars < @!w_cols_calc[$col] { # >
                             $str ~= ' ' x ( @!w_cols_calc[$col] - $number.chars ) ~ $number;
                         }
                         else {
@@ -651,11 +750,14 @@ method !_table_row_to_string {
                             $str ~= @!tbl_copy[$row][$col];
                         }
                     }
-                    if %!o<color> && @!tbl_orig[$row][$col].defined && @!tbl_orig[$row][$col] !~~ Buf {
-                        my Str @colors = @!tbl_orig[$row][$col].comb( &rx-color );
-                        if @colors.elems {
-                            $str.=subst( / $(ph-char) /, { @colors.shift }, :g );
-                            $str ~= "\e[0m";
+                      if %!o<color> {
+                        my Int $orig_col = $!used_cols_tbl_orig[$col];
+                        if @!tbl_orig[$row][$orig_col].defined && @!tbl_orig[$row][$orig_col] !~~ Buf {
+                            my Str @colors = @!tbl_orig[$row][$orig_col].comb( &rx-color );
+                            if @colors.elems {
+                                $str.=subst( / $(ph-char) /, { @colors.shift }, :g );
+                                $str ~= "\e[0m";
+                            }
                         }
                     }
                     $str ~= $col == @!w_cols_calc.end ?? $lrb !! $tab;
@@ -719,9 +821,12 @@ method !_search {
     }
     print hide-cursor;
     @!map_indexes = [];
-    for 1 .. @!tbl_copy.end -> $idx {
-        if @!tbl_copy[$idx].any ~~ $regex {
-            @!map_indexes.push: $idx;
+    for 1 .. @!tbl_copy.end -> $row {
+        for |$!desired_cols_tbl_orig -> $orig_col {
+            if @!tbl_orig[$row][$orig_col] ~~ $regex {
+                @!map_indexes.push: $row;
+                last;
+            }
         }
     }
     if ! @!map_indexes.elems {
@@ -741,7 +846,10 @@ method !_reset_search {
 
 method !_row_count ( $orig_row_count ) {
     if %!o<max-rows> && $orig_row_count >= %!o<max-rows> + 1 {
-        $!info_row = sprintf( 'ROW LIMIT %s (of %s)', insert-sep( %!o<max-rows>, $!thsd_sep ), insert-sep( $orig_row_count - 1, $!thsd_sep ) );
+        $!info_row = sprintf( 'Limited to %s rows (total %s)', insert-sep( %!o<max-rows>, $!thsd_sep ), insert-sep( $orig_row_count - 1, $!thsd_sep ) );
+        if %!o<pad-row-edges> {
+            $!info_row = ' ' ~ $!info_row;
+        }
         $!row_count = %!o<max-rows> + 1; # + 1 for header row
     }
     else {
@@ -780,7 +888,7 @@ method !_set_progress_bar {
     if ! $!p_bar<total> {
         return 0;
     }
-    my Int $term_w = get-term-size().[0] + extra-w;
+    my Int $term_w = term_width();
     $!p_bar<fmt> = "\rComputing: %3d%% [%s]";
     if $term_w < 25 {
         $!p_bar<short_print> = 1;
@@ -819,15 +927,6 @@ method !_header_separator {
         $header_sep ~= $_ == @!w_cols_calc.end ?? $lrb !! $tab;
     }
     return $header_sep;
-}
-
-
-method !_print_term_not_wide_enough_message {
-    my Str $prompt1 = 'Terminal window is not wide enough to print this table.';
-    $!tc.pause( [ 'Press ENTER to show the column names.' ], :prompt( $prompt1 ) );
-    #my Str $prompt2 = 'Reduce the number of columns".' ~ "\n" ~ 'Close with ENTER.';
-    my Str $prompt2 = 'Close with ENTER.';
-    $!tc.pause( @!tbl_copy[0], :prompt( $prompt2 ) );
 }
 
 
@@ -939,7 +1038,7 @@ If the terminal is too narrow to print the table, the columns are adjusted to th
 =item First, if the option I<trunc-fract-first> is enabled and if there are numbers that have a fraction, the fraction is
 truncated up to two decimal places.
 
-=item Then columns wider than I<min-col-width> are trimmed. See option L<#min-col-width>.
+=item Then columns wider than I<col-trim-threshold> are trimmed. See option L<#col-trim-threshold>.
 
 =item If it is still required to lower the row width all columns are trimmed until they fit into the terminal.
 
@@ -965,9 +1064,51 @@ The following arguments set the options (key-values pairs).
 
 Defaults may change in future releases.
 
-=head2 prompt
+=head2 binary-filter
 
-String displayed above the table.
+How to print arbitrary binary data:
+
+0 - Print the binary data as it is.
+
+1 - "BNRY" is printed instead of the binary data.
+
+2 - The binary data is printed in hexadecimal format.
+
+If the substring of the first 100 characters of the data matches the repexp
+C«/<[\x00..\x08\x0B..\x0C\x0E..\x1F]>/», the data is considered arbitrary binary data.
+
+Printing unfiltered arbitrary binary data could break the output.
+
+Default: 0
+
+=head2 choose-columns
+
+Controls whether the user can choose which columns to display.
+
+0 - Disabled
+
+The user is never prompted to select columns.
+
+1 - Always
+
+The user is always prompted to select which columns to display.
+
+In this mode, C<print_table> runs in an internal loop: after the table is displayed, the user is returned to the column
+selection screen. This allows for iterative viewing until the user exits by selecting the C«" << "» (Back) menu
+entry.
+
+If the chosen columns exceed the terminal width, C<print_table> falls back to the behavior described in item 2 (treating
+the chosen columns as the new "full" set).
+
+2 - Smart
+
+The user is prompted to select columns only if the table is too wide for the current terminal.
+
+Even if columns are hidden in the multi-row view:
+
+- The single-row view still displays all columns.
+
+- Searching with C<Ctrl-F> scans all columns, including hidden ones.
 
 =head2 color
 
@@ -980,6 +1121,11 @@ after each table cell.
 
 2 - on (current selected element colored)
 
+=head2 col-trim-threshold
+
+The columns with a width below or equal I<col-trim-threshold> are only trimmed, if it is still required to lower the row width
+despite all columns wider than I<col-width-treshold> have been trimmed to I<col-trim-threshold>.
+
 =head2 decimal-separator
 
 If set, numbers use I<decimal-separator> as the decimal separator instead of the default decimal separator.
@@ -988,6 +1134,18 @@ Allowed values: a character with a print width of C<1>. If an invalid values is 
 to the default value.
 
 Default: . (dot)
+
+=head2 expanded-line-spacing
+
+0 - Disabled
+
+1 - Insert a blank line between columns when a row is expanded.
+
+Default: 1
+
+=head2 expanded-max-width
+
+Set a maximum width of the expanded table row output. (See option L<#table-expand>).
 
 =head2 footer
 
@@ -1006,14 +1164,11 @@ Default: 50_000
 
 =head2 max-width-exp
 
-Set a maximum width of the expanded table row output. (See option L<#table-expand>).
+This option has been renamed to L<#expanded-max-width>.
 
 =head2 min-col-width
 
-The columns with a width below or equal I<min-col-width> are only trimmed if it is still required to lower the row width
-despite all columns wider than I<min-col-width> have been trimmed to I<min-col-width>.
-
-Default: 30
+This options has been renamed to L<#col-trim-threshold>.
 
 =head2 mouse
 
@@ -1035,6 +1190,10 @@ Set the progress bar threshold. If the number of fields (rows x columns) is high
 shown while preparing the data for the output. Setting the value to C<0> disables the progress bar.
 
 Default: 5_000
+
+=head2 prompt
+
+String displayed above the table.
 
 =head2 save-screen
 
@@ -1058,13 +1217,6 @@ If I<squash-spaces> is enabled, consecutive spaces are squashed to one space and
 removed.
 
 Default: 0
-
-=head2 tab-width
-
-Set the number of spaces between columns. If I<format> is set to C<2> and I<tab-width> is even, the spaces between the
-columns are I<tab-width> + 1 print columns.
-
-Default: 2
 
 =head2 table-expand
 
@@ -1096,6 +1248,13 @@ pressed.
 0 - off
 
 1 - on (default)
+
+=head2 tab-width
+
+Set the number of spaces between columns. If I<format> is set to C<2> and I<tab-width> is even, the spaces between the
+columns are I<tab-width> + 1 print columns.
+
+Default: 2
 
 =head2 trunc-fract-first
 
@@ -1149,7 +1308,7 @@ Matthäus Kiem <cuer2s@gmail.com>
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright 2016-2025 Matthäus Kiem.
+Copyright 2016-2026 Matthäus Kiem.
 
 This library is free software; you can redistribute it and/or modify it under the Artistic License 2.0.
 
