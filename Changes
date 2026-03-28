@@ -1,6 +1,10 @@
 Revision history for Term::TablePrint
 
 
+1.6.8  2026-03-28
+        - Bugfix scientific notation.
+        - Bugfix width remainder handling.
+
 1.6.7  2026-03-14
         - Changed file extensions from .pm6 to .rakumod
         - Renamed 'min-col-with' and 'max-width-exp'.

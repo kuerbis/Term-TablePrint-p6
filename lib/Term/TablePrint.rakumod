@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.6.7>;
+unit class Term::TablePrint:ver<1.6.8>;
 
 use Term::Choose;
 use Term::Choose::Constant;
@@ -68,7 +68,7 @@ method !_init_term {
     if %!o<save-screen> {
         print save-screen;
     }
-    $!tc = Term::Choose.new( :mouse( %!o<mouse> ), :1hide-cursor, :1clear-screen ); # c-s
+    $!tc = Term::Choose.new( :mouse( %!o<mouse> ), :1hide-cursor, :1clear-screen ); # c-s # :1hide-cursor ##
 }
 
 
@@ -615,7 +615,7 @@ method !_calc_avail_col_width( $term_w ) {
                         $reduced_col_w = $min_col_w;
                     }
                     if @!w_fract_calc[$col] > 2 {
-                        @!w_fract_calc[$col] = @!w_fract_calc[$col] - @!w_cols_calc[$col] - $reduced_col_w;
+                        @!w_fract_calc[$col] -= ( @!w_cols_calc[$col] - $reduced_col_w );
                         if @!w_fract_calc[$col] < 2 {
                             @!w_fract_calc[$col] = 2;
                         }
@@ -639,7 +639,10 @@ method !_calc_avail_col_width( $term_w ) {
                 my Int $prev_remainder_w = $remainder_w;
                 for ^@!w_cols_calc -> $col {
                     if @!w_cols_calc[$col] < @!w_cols[$col] {
-                        @!w_cols_calc[$col] = @!w_cols_calc[$col] + 1;
+                        ++@!w_cols_calc[$col];
+                        if @!w_fract_calc[$col] < @!w_fract[$col] && @!w_int[$col] + @!w_fract_calc[$col] < @!w_cols_calc[$col] {
+                            ++@!w_fract_calc[$col];
+                        }
                         --$remainder_w;
                         if $remainder_w == 0 {
                             last REMAINDER-W;
@@ -710,22 +713,24 @@ method !_table_row_to_string {
                             $number = $0.defined ?? $0 ~ $fract !! $fract;
                         }
                         if $number.chars > @!w_cols_calc[$col] {
-                            my Int $signed_1_precision_w = $one_precision_w + ( $number.starts-with( '-' ) ?? 1 !! 0 );
-                            my Int $precision;
-                            if @!w_cols_calc[$col] < $signed_1_precision_w {
-                                # special treatment because zero precision has no dot
+                            my Int $precision = @!w_cols_calc[$col] - ( $one_precision_w + ( $number < 0 ?? 1 !! 0 ) ) + 1;
+                            # $one_precision_w += 1 if the number is signed (-)
+                            # $precision += 1 because $one_precision_w contains already one precision
+                            if $precision == -1 {
                                 $precision = 0;
+                                # Difference between one-precision-width and zero-precision-width is 2 because zero precision has no dot.
                             }
-                            else {
-                                $precision = @!w_cols_calc[$col] - ( $signed_1_precision_w - 1 ); # -1 for the dot
+                            if $precision >= 0 {
+                                while ( ( $number = sprintf "%.*e", $precision, $number ).chars > @!w_cols_calc[$col] ) { ##
+                                    --$precision;
+                                    last if $precision < 0;
+                                }
                             }
-                            $number = sprintf "%.*e", $precision, $number;
-                            if $number.chars > @!w_cols_calc[$col] { # not enough space to print the number
+                            if $precision < 0 { # not enough space to print the number
                                 $str ~= ( '-' x @!w_cols_calc[$col] );
                             }
-                            elsif $number.chars < @!w_cols_calc[$col] { # @!w_cols_calc[$col] == zero_precision_w + 1 # >
-                                #$str ~= ' ' ~ $number;
-                                $str ~= $number ~ ' ';
+                            elsif $precision == 0 && $number.chars < @!w_cols_calc[$col] { # >
+                                $str ~= ' ' ~ $number;
                             }
                             else {
                                 $str ~= $number;
