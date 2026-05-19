@@ -680,11 +680,11 @@ method !_table_row_to_string {
         else {
             $header ~= @!tbl_copy[$header_idx][$col];
         }
-        if %!o<color> { # ###
+        if %!o<color> {
             my Int $orig_col = $!used_cols_tbl_orig[$col];
             if @!tbl_orig[$header_idx][$orig_col].defined && @!tbl_orig[$header_idx][$orig_col] !~~ Buf {
                 my Str @colors = @!tbl_orig[$header_idx][$orig_col].comb( &rx-color );
-                if @colors.elems {
+                if @colors {
                     $header.=subst( / $(ph-char) /, { @colors.shift }, :g );
                     $header ~= "\e[0m";
                 }
