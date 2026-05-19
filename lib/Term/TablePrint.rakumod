@@ -276,7 +276,7 @@ sub term_width { return get-term-size().[0] + extra-w }
 
 method !_used_columns ( Int $next? ) {
     my $tcu = Term::Choose::Util.new(
-        :1index, :1all-by-default, :1keep-chosen, :cs-begin( "\n" ), :confirm( '-OK_' ), :back( ' << ' )
+        :1index, :1all-by-default, :1keep-chosen, :cs-begin( "\n" ), :confirm( '-OK-' ), :back( ' << ' )
     );
     my Int @cols;
     if $next.defined && $next == %!wr_table<window_width_changed> {
@@ -284,7 +284,7 @@ method !_used_columns ( Int $next? ) {
     }
     elsif %!o<choose-columns> == 1 {
         # Choose
-        @cols = $tcu.choose-a-subset( @!tbl_orig[0], :cs-label( 'Chosen columns:' ) );
+        @cols = $tcu.choose-a-subset( @!tbl_orig[0], :cs-label( 'Chosen columns:' ), :color( %!o<color> ) );
         if ! @cols {
             return;
         }
@@ -679,6 +679,16 @@ method !_table_row_to_string {
         }
         else {
             $header ~= @!tbl_copy[$header_idx][$col];
+        }
+        if %!o<color> { # ###
+            my Int $orig_col = $!used_cols_tbl_orig[$col];
+            if @!tbl_orig[$header_idx][$orig_col].defined && @!tbl_orig[$header_idx][$orig_col] !~~ Buf {
+                my Str @colors = @!tbl_orig[$header_idx][$orig_col].comb( &rx-color );
+                if @colors.elems {
+                    $header.=subst( / $(ph-char) /, { @colors.shift }, :g );
+                    $header ~= "\e[0m";
+                }
+            }
         }
         $header ~= $col == @!w_cols_calc.end ?? $lrb !! $tab;
     }
