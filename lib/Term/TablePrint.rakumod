@@ -1,5 +1,5 @@
 use v6;
-unit class Term::TablePrint:ver<1.6.8>;
+unit class Term::TablePrint:ver<1.6.9>;
 
 use Term::Choose;
 use Term::Choose::Constant;
@@ -507,14 +507,14 @@ method !_calc_col_width {
     my Int $show_pg = self!_set_progress_bar;
     my Int @idx_cols = 0 .. @!tbl_copy[0].end; # new indexes
     @!w_heads = ();
+    my Int $header_idx = @!portions[0].shift;
     for @idx_cols -> $col {
-       @!w_heads[$col] = print-columns( @!tbl_copy[0][$col] );
+        @!w_heads[$col] = print-columns( @!tbl_copy[$header_idx][$col] );
     }
     my Int $size = @!tbl_copy[0].elems;
     my Int @w_cols[$size]  = ( 1 xx $size );
     my Int @w_int[$size]   = ( 0 xx $size );
     my Int @w_fract[$size] = ( 0 xx $size );
-    my Int $header_idx = @!portions[0].shift; # already done: w_heads
     my Str $ds = %!o<decimal-separator>;
     my Promise @promise;
     my Lock $lock = Lock.new();
@@ -615,7 +615,7 @@ method !_calc_avail_col_width( $term_w ) {
                         $reduced_col_w = $min_col_w;
                     }
                     if @!w_fract_calc[$col] > 2 {
-                        @!w_fract_calc[$col] -= ( @!w_cols_calc[$col] - $reduced_col_w );
+                        @!w_fract_calc[$col] -= ( @!w_cols_calc[$col] - $reduced_col_w ); ##
                         if @!w_fract_calc[$col] < 2 {
                             @!w_fract_calc[$col] = 2;
                         }
@@ -666,6 +666,23 @@ method !_table_row_to_string {
     my Str $ds = %!o<decimal-separator>;
     my Int $one_precision_w = sprintf( "%.1e", 123 ).chars;
     my Str $lrb = ' ' x $!edge_w;
+    my $tbl_print = [];
+    my Int $header_idx = @!portions[0].shift;
+    my Str $header = $lrb;
+    for @idx_cols -> $col {
+        my Int $width = print-columns( @!tbl_copy[$header_idx][$col] );
+        if $width > @!w_cols_calc[$col] {
+            $header ~= to-printwidth( @!tbl_copy[$header_idx][$col], @!w_cols_calc[$col], False ).[0];
+        }
+        elsif $width < @!w_cols_calc[$col] {
+            $header = $header ~ @!tbl_copy[$header_idx][$col] ~ ' ' x ( @!w_cols_calc[$col] - $width );
+        }
+        else {
+            $header ~= @!tbl_copy[$header_idx][$col];
+        }
+        $header ~= $col == @!w_cols_calc.end ?? $lrb !! $tab;
+    }
+    $tbl_print[$header_idx] = $header;
     my Promise @promise;
     my Lock $lock = Lock.new();
     for @!portions -> $range {
@@ -749,13 +766,13 @@ method !_table_row_to_string {
                             $str ~= to-printwidth( @!tbl_copy[$row][$col], @!w_cols_calc[$col], False, %cache ).[0];
                         }
                         elsif $width < @!w_cols_calc[$col] {
-                            $str =  $str ~ @!tbl_copy[$row][$col] ~ ' ' x ( @!w_cols_calc[$col] - $width );
+                            $str = $str ~ @!tbl_copy[$row][$col] ~ ' ' x ( @!w_cols_calc[$col] - $width );
                         }
                         else {
                             $str ~= @!tbl_copy[$row][$col];
                         }
                     }
-                      if %!o<color> {
+                    if %!o<color> {
                         my Int $orig_col = $!used_cols_tbl_orig[$col];
                         if @!tbl_orig[$row][$orig_col].defined && @!tbl_orig[$row][$orig_col] !~~ Buf {
                             my Str @colors = @!tbl_orig[$row][$orig_col].comb( &rx-color );
@@ -778,12 +795,12 @@ method !_table_row_to_string {
             }
         };
     }
-    my $tbl_print = [];
     for await @promise -> @portion {
         for @portion {
             $tbl_print[.[0]] = .[1];
         }
     }
+    @!portions[0].unshift: $header_idx;
     if $show_pg {
         self!_update_progress_bar();
     }

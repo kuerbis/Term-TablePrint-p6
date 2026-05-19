@@ -1,6 +1,9 @@
 Revision history for Term::TablePrint
 
 
+1.6.9   2026-05-19
+        - Bugfix: stringify header separately.
+
 1.6.8  2026-03-28
         - Bugfix scientific notation.
         - Bugfix width remainder handling.
